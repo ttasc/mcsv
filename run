@@ -1,0 +1,52 @@
+#!/bin/sh
+
+server="papermc"
+
+ZNETID="56374ac9a48452d2"
+ZNAME="MinecraftServer"
+ZIDPUBLIC="e070c7c492:0:87b73f9425be81fab1b5ea06a7228daa3dfd9af5503917d50b37619703acb52b2b2ed95389b21430c225593b46ab82beb7381032349b598baa1c05969f969c9d"
+ZIDSECRET="e070c7c492:0:87b73f9425be81fab1b5ea06a7228daa3dfd9af5503917d50b37619703acb52b2b2ed95389b21430c225593b46ab82beb7381032349b598baa1c05969f969c9d:d53155da34cdfbe00f5dacdb55836762cfe375658e6e5c0847605dbb1e6f82e5d5094ba8652240ba7742006b2f6636bf04742aad30b159ece724a75671cdf57e"
+
+docker run \
+    -d \
+    --rm \
+    --net=host \
+    --name "$ZNAME" \
+    --env ZEROTIER_IDENTITY_PUBLIC="$ZIDPUBLIC" \
+    --env ZEROTIER_IDENTITY_SECRET="$ZIDSECRET" \
+    --cap-add NET_ADMIN \
+    --device /dev/net/tun \
+    zerotier/zerotier:latest \
+    "$ZNETID"
+
+sudo update-java-alternatives --set java-1.21.0-openjdk-amd64
+
+pwd=$PWD
+cd "$server" || exit
+if [ "$1" = "r" ]; then
+    rm -rf ops.json permissions.yml usercache.json world*
+fi
+java -Xmx4096M \
+    -Xms4096M \
+    -XX:+AlwaysPreTouch \
+    -XX:+DisableExplicitGC \
+    -XX:+ParallelRefProcEnabled \
+    -XX:+PerfDisableSharedMem \
+    -XX:+UnlockExperimentalVMOptions \
+    -XX:+UseG1GC \
+    -XX:G1HeapRegionSize=8M \
+    -XX:G1HeapWastePercent=5 \
+    -XX:G1MaxNewSizePercent=40 \
+    -XX:G1MixedGCCountTarget=4 \
+    -XX:G1MixedGCLiveThresholdPercent=90 \
+    -XX:G1NewSizePercent=30 \
+    -XX:G1RSetUpdatingPauseTimePercent=5 \
+    -XX:G1ReservePercent=20 \
+    -XX:InitiatingHeapOccupancyPercent=15 \
+    -XX:MaxGCPauseMillis=200 \
+    -XX:MaxTenuringThreshold=1 \
+    -XX:SurvivorRatio=32 \
+    -Dusing.aikars.flags=https://mcflags.emc.gs \
+    -Daikars.new.flags=true \
+    -jar server.jar nogui
+cd "$pwd" || exit
