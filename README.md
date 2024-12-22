@@ -1,9 +1,9 @@
-## HOW IT WORK
-
-### Requirements
+## Requirements
 - Docker
 - ZeroTier
 - Java 21 (JDK)
+
+## HOW IT WORK
 
 ### Initial setup
 - Create [ZeroTier Network](https://my.zerotier.com/network/) (you need an account), see [docs](https://docs.zerotier.com/start/)
