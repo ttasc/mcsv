@@ -1,5 +1,10 @@
 ## HOW IT WORK
 
+### Requirements
+- Docker
+- ZeroTier
+- Java 21 (JDK)
+
 ### Initial setup
 - Create [ZeroTier Network](https://my.zerotier.com/network/) (you need an account), see [docs](https://docs.zerotier.com/start/)
 - On your local machine, install [ZeroTier](https://docs.zerotier.com/releases) and [join](https://docs.zerotier.com/cli) the network you just created
