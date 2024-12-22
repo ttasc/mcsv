@@ -1,9 +1,13 @@
-## Requirements
+# Minecraft Server
+Run Minecraft as a **public** server on Ubuntu without `public ip` or `port forward` over ZeroTier Network
+
+## Server Requirements
 - Docker
-- ZeroTier
 - Java 21 (JDK)
+- ZeroTier
 
 ## HOW IT WORK
+> #### I use [Google Cloud Shell](https://shell.cloud.google.com/?cloudshell=true&show=terminal) as a server in this guide
 
 ### Initial setup
 - Create [ZeroTier Network](https://my.zerotier.com/network/) (you need an account), see [docs](https://docs.zerotier.com/start/)
