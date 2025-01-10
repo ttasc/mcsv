@@ -37,7 +37,8 @@ sudo update-java-alternatives --set java-1.21.0-openjdk-amd64
 pwd=$PWD
 cd "$server_path" || exit
 if [ "$1" = "r" ]; then
-    rm -rf ops.json permissions.yml usercache.json world*
+    echo "##### Removing existing world... #####"
+    rm -rfv ops.json permissions.yml usercache.json world*
 fi
 java -Xmx4096M \
     -Xms4096M \
