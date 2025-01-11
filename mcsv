@@ -4,6 +4,19 @@ if ! command -v java >/dev/null 2>&1; then
     echo "Java is not installed, please install latest java version (current java21)"
     exit 1
 fi
+draw_line() {
+    i=0; while [ $i -lt "$(("$2"+2))" ]; do
+        printf "%s" "$1"
+        i=$((i+1))
+    done
+}
+draw_addr() {
+    tb="─" lr="│" tl="╭" tr="╮" bl="╰" br="╯"
+    len="${#1}"
+    printf "%s" "$tl"; draw_line "$tb" "$len"; echo "$tr"
+    printf "%s" "$lr"; printf " %s " "$1"; echo "$lr"
+    printf "%s" "$bl"; draw_line "$tb" "$len"; echo "$br"
+}
 run_zt_on_docker() {
     if ! command -v docker >/dev/null 2>&1; then
         echo "Docker is not installed!"
@@ -24,21 +37,23 @@ run_zt_on_docker() {
         printf "Please enter ZeroTier Network ID: "
         read -r id
         echo "$id" > "$ztnet"
-        znetid="$(cat "$ztnet" )"
+        znetid="$(cat "$ztnet")"
         zidpublic="$(sed 's/:/\n/3' "$ztkey" | head -n1)"
         zidsecret="$(cat "$ztkey")"
-        docker run \
-        -d \
-        --rm \
-        --net=host \
-        --name "$name" \
-        --env ZEROTIER_IDENTITY_PUBLIC="$zidpublic" \
-        --env ZEROTIER_IDENTITY_SECRET="$zidsecret" \
-        --cap-add NET_ADMIN \
-        --device /dev/net/tun \
-        zerotier/zerotier:latest \
-        "$znetid"
     fi
+    docker run \
+    -d \
+    --rm \
+    --net=host \
+    --name "$name" \
+    --env ZEROTIER_IDENTITY_PUBLIC="$zidpublic" \
+    --env ZEROTIER_IDENTITY_SECRET="$zidsecret" \
+    --cap-add NET_ADMIN \
+    --device /dev/net/tun \
+    zerotier/zerotier:latest \
+    "$znetid"
+    ztip="$(docker exec getztkey zerotier-cli listnetworks | grep "$ztnet" | awk '{print $9}' | cut -d"/" -f1)"
+    draw_addr "$ztip"
 }
 
 while getopts 'zr' opt; do
@@ -53,29 +68,16 @@ shift $((OPTIND-1))
 [ -z "$1" ] && echo "Please specify Server version (the name of the folder contain server jar file)" && exit 1
 
 pwd=$PWD; cd "$1" || exit 1
+
 [ "$rmworld" = true ] && rm -rfv ops.json permissions.yml usercache.json world*
 sudo update-java-alternatives --set java-1.21.0-openjdk-amd64 || java --version
-java -Xmx4096M \
-    -Xms4096M \
-    -XX:+AlwaysPreTouch \
-    -XX:+DisableExplicitGC \
-    -XX:+ParallelRefProcEnabled \
-    -XX:+PerfDisableSharedMem \
-    -XX:+UnlockExperimentalVMOptions \
-    -XX:+UseG1GC \
-    -XX:G1HeapRegionSize=8M \
-    -XX:G1HeapWastePercent=5 \
-    -XX:G1MaxNewSizePercent=40 \
-    -XX:G1MixedGCCountTarget=4 \
-    -XX:G1MixedGCLiveThresholdPercent=90 \
-    -XX:G1NewSizePercent=30 \
-    -XX:G1RSetUpdatingPauseTimePercent=5 \
-    -XX:G1ReservePercent=20 \
-    -XX:InitiatingHeapOccupancyPercent=15 \
-    -XX:MaxGCPauseMillis=200 \
-    -XX:MaxTenuringThreshold=1 \
-    -XX:SurvivorRatio=32 \
-    -Dusing.aikars.flags=https://mcflags.emc.gs \
-    -Daikars.new.flags=true \
-    -jar ./*.jar nogui
+java -Xmx4096M -Xms4096M -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -XX:+PerfDisableSharedMem -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1HeapRegionSize=8M -XX:G1HeapWastePercent=5 -XX:G1MaxNewSizePercent=40 -XX:G1MixedGCCountTarget=4 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1NewSizePercent=30 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=15 -XX:MaxGCPauseMillis=200 -XX:MaxTenuringThreshold=1 -XX:SurvivorRatio=32 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true -jar ./*.jar nogui | \
+while read -r line; do
+    set -- $line
+    case "$5" in
+        *.e4mc.link) draw_addr "$5" ;;
+        *) echo "$line" ;;
+    esac
+done
+
 cd "$pwd" || exit 1
