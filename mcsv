@@ -52,7 +52,7 @@ run_zt_on_docker() {
     --device /dev/net/tun \
     zerotier/zerotier:latest \
     "$znetid"
-    ztip="$(docker exec getztkey zerotier-cli listnetworks | grep "$ztnet" | awk '{print $9}' | cut -d"/" -f1)"
+    ztip="$(docker exec "$name" zerotier-cli listnetworks | grep "$ztnet" | awk '{print $9}' | cut -d"/" -f1)"
     draw_addr "$ztip"
 }
 
