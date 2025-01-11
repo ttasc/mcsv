@@ -37,10 +37,10 @@ run_zt_on_docker() {
         printf "Please enter ZeroTier Network ID: "
         read -r id
         echo "$id" > "$ztnet"
-        znetid="$(cat "$ztnet")"
-        zidpublic="$(sed 's/:/\n/3' "$ztkey" | head -n1)"
-        zidsecret="$(cat "$ztkey")"
     fi
+    znetid="$(cat "$ztnet")"
+    zidpublic="$(sed 's/:/\n/3' "$ztkey" | head -n1)"
+    zidsecret="$(cat "$ztkey")"
     docker stop "$name"
     docker run \
     -d \
