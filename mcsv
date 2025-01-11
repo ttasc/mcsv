@@ -53,8 +53,8 @@ run_zt_on_docker() {
     --device /dev/net/tun \
     zerotier/zerotier:latest \
     "$znetid"
+    while [ -z "$(docker exec "$name" zerotier-cli listnetworks | grep "$ztnet" | awk '{print $9}' | cut -d"/" -f1)" ]; do :; echo "getting ZeroTier ip..."; done
     ztip="$(docker exec "$name" zerotier-cli listnetworks | grep "$ztnet" | awk '{print $9}' | cut -d"/" -f1)"
-    while [ -z "$(docker exec "$name" zerotier-cli listnetworks | grep "$ztnet" | awk '{print $9}' | cut -d"/" -f1)" ]; do : sleep; done
     draw_addr "$ztip"
 }
 
