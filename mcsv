@@ -54,7 +54,7 @@ run_zt_on_docker() {
     zerotier/zerotier:latest \
     "$znetid"
     ztip="$(docker exec "$name" zerotier-cli listnetworks | grep "$ztnet" | awk '{print $9}' | cut -d"/" -f1)"
-    while [ -z "$(docker exec "$name" zerotier-cli listnetworks | grep "$ztnet" | awk '{print $9}' | cut -d"/" -f1)" ]; do :sleep; done
+    while [ -z "$(docker exec "$name" zerotier-cli listnetworks | grep "$ztnet" | awk '{print $9}' | cut -d"/" -f1)" ]; do : sleep; done
     draw_addr "$ztip"
 }
 
