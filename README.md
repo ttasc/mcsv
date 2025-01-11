@@ -24,10 +24,19 @@ By default, **e4mc** mod is already added to fabric server, so you don't need to
     ```sh
     chmod +x mcsv && ./mcsv -z fabric/1.20.1
     ```
-- Then [join](https://docs.zerotier.com/cli) your cloud shell to the network you created above
-- Finally, open Minecraft game and join your server by the [ip address](https://docs.zerotier.com/start#find-the-zerotier-ip-addresses-of-your-devices) show on [ZeroTier Network Central](https://my.zerotier.com/network/)
-> **Note:**
-> - You need to [authenticate](https://docs.zerotier.com/start#authorize-your-device) every time you join a device to a ZeroTier Network if the network you created is private.
+- Then you need to [authenticate](https://docs.zerotier.com/start#authorize-your-device) every time you join a device to a ZeroTier Network if the network you created is private.
+- Finally, follow the console log to get the address of your server, it should look like this:
+    ```sh
+    ╭─────────────────────────╮
+    │ ZeroTier ip: 172.25.0.1 │
+    ╰─────────────────────────╯
+
+    # .... Some log lines
+
+    ╭─────────────────────────────────────────╮
+    │ e4mc address: pyramid-news.ap.e4mc.link │
+    ╰─────────────────────────────────────────╯
+    ```
 
 ### Options
 > ##### Note: run script without -z flag will only run Minecraft server jar file
