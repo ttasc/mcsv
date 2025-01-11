@@ -16,8 +16,8 @@ Run Minecraft as a **public** server on Ubuntu without `public ip` or `port forw
 
 ### Run server
 - Inside **mcsv** folder, run:
-    ```
-    chmod +x mcsv && ./mcsv
+    ```sh
+    chmod +x mcsv && ./mcsv -z 1.21.3
     ```
 - Then [join](https://docs.zerotier.com/cli) your cloud shell to the network you created above
 - Finally, open Minecraft game and join your server by the [ip address](https://docs.zerotier.com/start#find-the-zerotier-ip-addresses-of-your-devices) show on [ZeroTier Network Central](https://my.zerotier.com/network/)
@@ -25,7 +25,13 @@ Run Minecraft as a **public** server on Ubuntu without `public ip` or `port forw
 > - You need to [authenticate](https://docs.zerotier.com/start#authorize-your-device) every time you join a device to a ZeroTier Network if the network you created is private.
 
 ### Options
-Run `mcsv` with `r` option will delete existing minecraft world before start server (it will be re-created):
+> ##### Note: run script without -z flag will only run Minecraft server jar file
 ```
-./mcsv r
+Run:
+    mcsv [OPTIONS...] PATH
+PATH:
+    The path of the folder contain server .jar file
+OPTION:
+    -z      start and join the Server to ZeroTier-Network
+    -r      delete existing world and start Server
 ```
