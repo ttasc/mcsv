@@ -1,7 +1,7 @@
 #!/bin/sh
 
 if ! command -v java >/dev/null 2>&1; then
-    echo "Java is not installed, please install latest java version (current java21)"
+    echo "Java is not installed, please install java version 21"
     exit 1
 fi
 draw_line() {
