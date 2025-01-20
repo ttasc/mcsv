@@ -17,13 +17,17 @@ draw_addr() {
     printf "%s" "$lr"; printf " %s " "$1"; echo "$lr"
     printf "%s" "$bl"; draw_line "$tb" "$len"; echo "$br"
 }
-run_zt_on_docker() {
+setup_and_run_zt() {
     if ! command -v docker >/dev/null 2>&1; then
         echo "Docker is not installed!"
         echo "Please install docker and re-run this script with z flag"
         echo "OR"
-        echo "Install and configure Zerotier manually"
-        exit 1
+        echo "Install and configure Zerotier manually (Debian-base only) [Y/n]"
+        read -r yn
+        case $yn in
+            ""|[Yy]* ) curl -s https://install.zerotier.com | sudo bash ;;
+            * ) exit 1 ;;
+        esac
     fi
     name="mcsv" # Container name
     ztkey="$HOME/.mcsv.ztkey"
@@ -60,7 +64,7 @@ run_zt_on_docker() {
 
 while getopts 'zr' opt; do
     case "$opt" in
-        z) run_zt_on_docker ;;
+        z) setup_and_run_zt ;;
         r) rmworld=true ;;
         *) echo "Invalid option!" ;;
     esac
