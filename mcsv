@@ -17,65 +17,67 @@ draw_addr() {
     printf "%s" "$lr"; printf " %s " "$1"; echo "$lr"
     printf "%s" "$bl"; draw_line "$tb" "$len"; echo "$br"
 }
-setup_and_run_zt() {
-    if ! command -v docker >/dev/null 2>&1; then
-        echo "Docker is not installed!"
-        echo "Please install docker and re-run this script with z flag"
-        echo "OR"
-        echo "Install and configure Zerotier manually (Debian-base only) [Y/n]"
-        read -r yn
-        case $yn in
-            ""|[Yy]* )
-                nodocker=true
-                curl -s https://install.zerotier.com | sudo bash ;;
-            * ) exit 1 ;;
-        esac
-    fi
-    name="mcsv" # Container name
-    ztkey="$HOME/.mcsv.ztkey"
-    ztnet="$HOME/.mcsv.ztnet"
+
+name="mcsv" # Container name
+ztkey="$HOME/.mcsv.ztkey"
+ztnet="$HOME/.mcsv.ztnet"
+manual_zt() {
     if [ ! -f "$ztkey" ]; then
-        if [ "$nodocker" = true ]; then
-            zerotier-idtool generate > "$ztkey"
-        else
-            docker run -d --name getztkey --rm --cap-add NET_ADMIN --device /dev/net/tun zerotier/zerotier:latest
-            docker exec getztkey zerotier-idtool generate > "$ztkey"
-            docker stop getztkey
-        fi
+        zerotier-idtool generate > "$ztkey"
     fi
+    zidpublic="$(sed 's/:/\n/3' "$ztkey" | head -n1)"
+    zidsecret="$(cat "$ztkey")"
+    killall zerotier-one 2>/dev/null
+    printf "%s" "$zidpublic" > /var/lib/zerotier-one/identity.secret
+    printf "%s" "$zidsecret" > /var/lib/zerotier-one/identity.public
+    zerotier-one -d
+    zerotier-cli join "$znetid"
+    while [ -z "$(zerotier-cli listnetworks | grep "$znetid" | awk '{print $9}' | cut -d"/" -f1)" ]; do :; echo "getting ZeroTier ip..."; sleep 1; done
+    ztip="$(zerotier-cli listnetworks | grep "$znetid" | awk '{print $9}' | cut -d"/" -f1)"
+}
+docker_zt() {
+    if [ ! -f "$ztkey" ]; then
+        docker run -d --name getztkey --rm --cap-add NET_ADMIN --device /dev/net/tun zerotier/zerotier:latest
+        docker exec getztkey zerotier-idtool generate > "$ztkey"
+        docker stop getztkey
+    fi
+    zidpublic="$(sed 's/:/\n/3' "$ztkey" | head -n1)"
+    zidsecret="$(cat "$ztkey")"
+    docker stop "$name" 2>/dev/null
+    docker run \
+    -d \
+    --rm \
+    --net=host \
+    --name "$name" \
+    --env ZEROTIER_IDENTITY_PUBLIC="$zidpublic" \
+    --env ZEROTIER_IDENTITY_SECRET="$zidsecret" \
+    --cap-add NET_ADMIN \
+    --device /dev/net/tun \
+    zerotier/zerotier:latest \
+    "$znetid"
+    while [ -z "$(docker exec "$name" zerotier-cli listnetworks | grep "$znetid" | awk '{print $9}' | cut -d"/" -f1)" ]; do :; echo "getting ZeroTier ip..."; sleep 1; done
+    ztip="$(docker exec "$name" zerotier-cli listnetworks | grep "$znetid" | awk '{print $9}' | cut -d"/" -f1)"
+}
+setup_and_run_zt() {
     if [ ! -f "$ztnet" ] || [ -z "$(cat "$ztnet" )" ]; then
         printf "Please enter ZeroTier Network ID: "
         read -r id
         echo "$id" > "$ztnet"
     fi
     znetid="$(cat "$ztnet")"
-    zidpublic="$(sed 's/:/\n/3' "$ztkey" | head -n1)"
-    zidsecret="$(cat "$ztkey")"
-
-    if [ "$nodocker" = true ]; then
-        killall zerotier-one 2>/dev/null
-        printf "%s" "$zidpublic" > /var/lib/zerotier-one/identity.secret
-        printf "%s" "$zidsecret" > /var/lib/zerotier-one/identity.public
-        zerotier-one -d
-        zerotier-cli join "$znetid"
-        while [ -z "$(zerotier-cli listnetworks | grep "$znetid" | awk '{print $9}' | cut -d"/" -f1)" ]; do :; echo "getting ZeroTier ip..."; sleep 1; done
-        ztip="$(zerotier-cli listnetworks | grep "$znetid" | awk '{print $9}' | cut -d"/" -f1)"
+    if command -v zerotier-one >/dev/null 2>&1; then
+        manual_zt
+    elif command -v docker >/dev/null 2>&1; then
+        docker_zt
     else
-        docker stop "$name" 2>/dev/null
-        docker run \
-        -d \
-        --rm \
-        --net=host \
-        --name "$name" \
-        --env ZEROTIER_IDENTITY_PUBLIC="$zidpublic" \
-        --env ZEROTIER_IDENTITY_SECRET="$zidsecret" \
-        --cap-add NET_ADMIN \
-        --device /dev/net/tun \
-        zerotier/zerotier:latest \
-        "$znetid"
-        while [ -z "$(docker exec "$name" zerotier-cli listnetworks | grep "$znetid" | awk '{print $9}' | cut -d"/" -f1)" ]; do :; echo "getting ZeroTier ip..."; sleep 1; done
-        ztip="$(docker exec "$name" zerotier-cli listnetworks | grep "$znetid" | awk '{print $9}' | cut -d"/" -f1)"
+        echo "Both Docker and ZeroTier are not installed!"
+        echo "Please install docker"
+        echo "OR"
+        echo "Install and configure Zerotier manually"
+        echo "Then re-run this script with z flag"
+        exit 1
     fi
+
     draw_addr "ZeroTier ip: $ztip"
 }
 
