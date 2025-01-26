@@ -30,9 +30,8 @@ opts="
 -XX:MaxTenuringThreshold=1
 -XX:SurvivorRatio=32
 -Dusing.aikars.flags=https://mcflags.emc.gs
--Daikars.new.flags=true
-"
-javaopts="java $opts"
+-Daikars.new.flags=true"
+javaopts="java$(echo "$opts" | tr '\n' ' ')"
 
 if pgrep -f "$javaopts"; then die "mcsv: another Minecraft Server is already running in background"; fi
 
