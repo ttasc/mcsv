@@ -30,10 +30,11 @@ opts="
 -XX:MaxTenuringThreshold=1
 -XX:SurvivorRatio=32
 -Dusing.aikars.flags=https://mcflags.emc.gs
--Daikars.new.flags=true"
-javaopts="java$(echo "$opts" | tr '\n' ' ')"
+-Daikars.new.flags=true
+"
+start_server="java $opts -jar ./*.jar nogui"
 
-if pgrep -f "$javaopts"; then die "mcsv: another Minecraft Server is already running in background"; fi
+if pgrep -f ".jar nogui"; then die "mcsv: another Minecraft Server is already running in background"; fi
 
 while getopts 'rd' opt; do
     case "$opt" in
@@ -57,10 +58,10 @@ if [ "$daemon" = true ]; then
         mkfifo "$dir"/in
     fi
     (
-        tail -f "$dir"/in | nohup $javaopts -jar ./*.jar nogui > "$dir"/out 2> "$dir"/err; rm -rf "$dir"
+        tail -f "$dir"/in | nohup $start_server > "$dir"/out 2> "$dir"/err; rm -rf "$dir"
     ) &
 else
-    $javaopts -jar ./*.jar nogui
+    $start_server
 fi
 
 cd "$pwd"
