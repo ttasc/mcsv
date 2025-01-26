@@ -3,12 +3,9 @@
 
 set -e
 pwd=$PWD
-dir=/tmp/mcsv
+dir=/tmp/server@TTlaugh/mcsv
 
 die() { echo "$1"; exit 1; }
-
-if [ -d "$dir" ]; then die "mcsv: another Minecraft Server is already running in background"; fi
-
 if ! command -v java >/dev/null 2>&1; then die "Java is not installed!"; fi
 
 opts="
@@ -35,6 +32,9 @@ opts="
 -Dusing.aikars.flags=https://mcflags.emc.gs
 -Daikars.new.flags=true
 "
+cmd="java $opts -jar ./*.jar nogui"
+
+if pgrep -f "$cmd"; then die "mcsv: another Minecraft Server is already running in background"; fi
 
 while getopts 'rd' opt; do
     case "$opt" in
@@ -54,16 +54,14 @@ fi
 
 if [ "$daemon" = true ]; then
     mkdir -p "$dir"
-    if [ ! -p "$dir"/in ]; then mkfifo "$dir"/in; fi
-    tail -f "$dir"/in | ( nohup java $opts -jar ./*.jar nogui > "$dir"/out 2> "$dir"/err && rm -rf "$dir" ) || rm -rf "$dir" &
-    echo "Server is starting in background..."
-    echo "fd redirect to:
-    stdin : $dir/in  (Control server by writing to this file)
-    stdout: $dir/out (Check server log by reading this file)
-    stderr: $dir/err (N/A)
-    "
+    if [ ! -p "$dir"/in ]; then
+        mkfifo "$dir"/in
+    fi
+    (
+        tail -f "$dir"/in | nohup "$cmd" > "$dir"/out 2> "$dir"/err; rm -rf "$dir"
+    ) &
 else
-    java $opts -jar ./*.jar nogui
+    "$cmd"
 fi
 
 cd "$pwd"
