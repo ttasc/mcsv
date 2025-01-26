@@ -34,7 +34,7 @@ opts="
 "
 start_server="java $opts -jar ./*.jar nogui"
 
-if pgrep -f ".jar nogui"; then die "mcsv: another Minecraft Server is already running in background"; fi
+if pid=$(pgrep -f ".jar nogui" 2>/dev/null); then die "mcsv: another Minecraft Server is already running in background (pid:$pid)"; fi
 
 while getopts 'rd' opt; do
     case "$opt" in
