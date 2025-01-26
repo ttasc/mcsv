@@ -32,7 +32,7 @@ opts="
 -Dusing.aikars.flags=https://mcflags.emc.gs
 -Daikars.new.flags=true
 "
-cmd="java $opts -jar ./*.jar nogui"
+cmd="java $opts -jar server.jar nogui"
 
 if pgrep -f "$cmd"; then die "mcsv: another Minecraft Server is already running in background"; fi
 
