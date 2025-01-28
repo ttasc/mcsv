@@ -51,8 +51,7 @@ fi
 
 if [ "$attach" = true ]; then
     if [ -z "$pid" ]; then
-        echo "mcsv is not running."
-        exit 1
+        die "mcsv is not running."
     fi
     tail -f "$fddir"/out &
     while read -r input; do
@@ -61,8 +60,7 @@ if [ "$attach" = true ]; then
     done
 else
     if [ -n "$pid" ]; then
-        echo "mcsv is already running in background (pid:$pid)"
-        exit 1
+        die "mcsv is already running in background (pid:$pid)"
     fi
     jardir="${1:-.}"
     if [ ! -f "$jardir/$jarfile" ]; then die "Please specify Server version (the name of the folder contain $jarfile file)"; fi
