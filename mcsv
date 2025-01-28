@@ -53,11 +53,12 @@ if [ "$attach" = true ]; then
     if [ -z "$pid" ]; then
         die "mcsv is not running."
     fi
-    tail -f "$fddir"/out &
-    while read -r input; do
-        if ! kill -0 "$pid"; then exit 0; fi
+    tail -f --pid="$pid" "$fddir"/out &
+    while kill -0 "$pid" >/dev/null 2>&1 && read -r input; do
         echo "$input" > "$fddir"/in
     done
+    echo disconnecting...
+    wait
 else
     if [ -n "$pid" ]; then
         die "mcsv is already running in background (pid:$pid)"
