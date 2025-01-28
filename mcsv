@@ -3,7 +3,8 @@
 
 set -e
 pwd=$PWD
-dir=/tmp/server@TTlaugh/mcsv
+fddir=/tmp/server@TTlaugh/mcsv # file descriptor location (std-in/out/err)
+jarfile="mcsv.jar"
 
 die() { echo "$1"; exit 1; }
 if ! command -v java >/dev/null 2>&1; then die "Java is not installed!"; fi
@@ -32,36 +33,53 @@ opts="
 -Dusing.aikars.flags=https://mcflags.emc.gs
 -Daikars.new.flags=true
 "
-start_server="java $opts -jar ./*.jar nogui"
+start_server="java $opts -jar $jarfile nogui"
 
-if pid=$(pgrep -f ".jar nogui" 2>/dev/null); then die "mcsv: another Minecraft Server is already running in background (pid:$pid)"; fi
-
-while getopts 'rd' opt; do
+while getopts 'rda' opt; do
     case "$opt" in
         r) rmworld=true ;;
         d) daemon=true ;;
+        a) attach=true ;;
         *) echo "Invalid option!" ;;
     esac
 done
 shift $((OPTIND-1))
 
-if [ -z "$1" ]; then die "Please specify Server version (the name of the folder contain server jar file)"; fi
-cd "$1"
-
-if [ "$rmworld" = true ];then
-    rm -rfv ops.json permissions.yml usercache.json world*
+if [ -d "$fddir" ]; then
+    pid="$(pgrep -f "$jarfile nogui" 2>/dev/null)"
 fi
 
-if [ "$daemon" = true ]; then
-    mkdir -p "$dir"
-    if [ ! -p "$dir"/in ]; then
-        mkfifo "$dir"/in
+if [ "$attach" = true ]; then
+    if [ -z "$pid" ]; then
+        echo "mcsv is not running."
+        exit 1
     fi
-    (
-        tail -f "$dir"/in | nohup $start_server > "$dir"/out 2> "$dir"/err; rm -rf "$dir"
-    ) &
+    tail -f "$fddir"/out &
+    while read -r input; do
+        if ! kill -0 "$pid"; then exit 0; fi
+        echo "$input" > "$fddir"/in
+    done
 else
-    $start_server
+    if [ -n "$pid" ]; then
+        echo "mcsv is already running in background (pid:$pid)"
+        exit 1
+    fi
+    jardir="${1:-.}"
+    if [ ! -f "$jardir/$jarfile" ]; then die "Please specify Server version (the name of the folder contain $jarfile file)"; fi
+    cd "$jardir"
+    if [ "$rmworld" = true ];then
+        rm -rfv ops.json permissions.yml usercache.json world*
+    fi
+    if [ "$daemon" = true ]; then
+        mkdir -p "$fddir"
+        if [ ! -p "$fddir"/in ]; then
+            mkfifo "$fddir"/in
+        fi
+        (
+            tail -f "$fddir"/in | nohup $start_server > "$fddir"/out 2> "$fddir"/err; rm -rf "$fddir"
+        ) &
+    else
+        $start_server
+    fi
+    cd "$pwd"
 fi
-
-cd "$pwd"
