@@ -53,7 +53,7 @@ if [ "$attach" = true ]; then
     if [ -z "$pid" ]; then
         die "mcsv is not running."
     fi
-    tail -f --pid="$pid" "$fddir"/out &
+    tail -f --pid="$$" --pid="$pid" "$fddir"/out &
     while kill -0 "$pid" >/dev/null 2>&1 && read -r input; do
         echo "$input" > "$fddir"/in
     done
