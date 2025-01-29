@@ -54,7 +54,8 @@ if [ "$attach" = true ]; then
         die "mcsv is not running."
     fi
     tail -f --pid="$$" "$fddir"/out &
-    while kill -0 "$pid" >/dev/null 2>&1 && read -r input; do
+    while read -r input; do
+        if ! kill -0 "$pid" >/dev/null 2>&1; then break; fi
         echo "$input" > "$fddir"/in
     done
     wait
