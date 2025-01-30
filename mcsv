@@ -45,9 +45,7 @@ while getopts 'rda' opt; do
 done
 shift $((OPTIND-1))
 
-if [ -d "$fddir" ]; then
-    pid="$(pgrep -f "$jarfile nogui" 2>/dev/null)"
-fi
+pid="$(pgrep -f "$jarfile nogui" 2>/dev/null)"
 
 if [ "$attach" = true ]; then
     if [ -z "$pid" ]; then
