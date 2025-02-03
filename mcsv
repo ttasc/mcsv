@@ -70,7 +70,7 @@ else
             mkfifo "$fddir"/in
         fi
         (
-            tail -f "$fddir"/in | nohup $start_server > "$fddir"/out 2> "$fddir"/err && echo "Server is completely shutdown. Press any key to exit."; rm -rf "$fddir"
+            tail -f "$fddir"/in | nohup $start_server > "$fddir"/out 2> "$fddir"/err && echo "Server is completely shutdown. Press any key to exit." >> "$fddir"/out; rm -rf "$fddir"
         ) &
     else
         $start_server
