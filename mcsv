@@ -45,10 +45,8 @@ while getopts 'rda' opt; do
 done
 shift $((OPTIND-1))
 
-pid="$(pgrep -f "$jarfile nogui" 2>/dev/null)"
-
 if [ "$attach" = true ]; then
-    if [ -z "$pid" ]; then
+    if ! pgrep -f "$jarfile nogui" 2>/dev/null; then
         die "mcsv is not running."
     fi
     tail -f --pid="$$" "$fddir"/out &
@@ -57,7 +55,7 @@ if [ "$attach" = true ]; then
         echo "$input" > "$fddir"/in
     done
 else
-    if [ -n "$pid" ]; then
+    if pid="$(pgrep -f "$jarfile nogui" 2>/dev/null)"; then
         die "mcsv is already running in background (pid:$pid)"
     fi
     jardir="${1:-.}"
