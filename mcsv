@@ -46,7 +46,7 @@ done
 shift $((OPTIND-1))
 
 if [ "$attach" = true ]; then
-    if ! pgrep -f "$jarfile nogui" 2>/dev/null; then
+    if ! pid="$(pgrep -f "$jarfile nogui" 2>/dev/null)"; then
         die "mcsv is not running."
     fi
     tail -f --pid="$$" "$fddir"/out &
