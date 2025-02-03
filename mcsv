@@ -56,7 +56,6 @@ if [ "$attach" = true ]; then
         if ! kill -0 "$pid" >/dev/null 2>&1; then break; fi
         echo "$input" > "$fddir"/in
     done
-    wait
 else
     if [ -n "$pid" ]; then
         die "mcsv is already running in background (pid:$pid)"
