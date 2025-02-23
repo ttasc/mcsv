@@ -3,7 +3,7 @@
 
 set -e
 pwd=$PWD
-fddir=/tmp/server@TTlaugh/mcsv # file descriptor location (std-in/out/err)
+fddir=/tmp/server@ttasc/mcsv # file descriptor location (std-in/out/err)
 jarfile="mcsv.jar"
 
 die() { echo "$1"; exit 1; }
