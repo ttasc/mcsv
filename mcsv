@@ -22,11 +22,11 @@ while getopts 'rdam:' opt; do
 done
 shift $((OPTIND-1))
 
+real_mem_size="$(sed 1q /proc/meminfo | tr -s ' ' | cut -d' ' -f2)"
+real_mem_size=$((real_mem_size/1024))
 if [ -z $malloc ]; then
     printf "You do not provide a RAM size to the server.\nSo the script will use an amount of RAM\nless than or equal to the system's maximum RAM.\n"
     echo "You can use \`-m <mem_size_in_MB>\` to specify amount of RAM to allocation for server."
-    real_mem_size="$(sed 1q /proc/meminfo | tr -s ' ' | cut -d' ' -f2)"
-    real_mem_size=$((real_mem_size/1024))
     list_mem_size="131072 65536 32768 16384 12288 10240 8192 6144 4096 2048 1024"
     for mem_size in $list_mem_size; do
         if [ $real_mem_size -ge $mem_size ]; then
@@ -37,6 +37,9 @@ if [ -z $malloc ]; then
         die "ERROR: unable to allocate RAM to server!"
     fi
     printf "\033[32m\033[1mUse %s of RAM for server\033[m\n" $malloc
+fi
+if [ $malloc -gt $real_mem_size ] || [ $malloc -lt 1024 ]; then
+    die "Can't start server with allocated RAM: $malloc"
 fi
 
 opts="
