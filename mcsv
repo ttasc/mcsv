@@ -30,7 +30,7 @@ if [ -z $malloc ]; then
     list_mem_size="131072 65536 32768 16384 12288 10240 8192 6144 4096 2048 1024"
     for mem_size in $list_mem_size; do
         if [ $real_mem_size -ge $mem_size ]; then
-            malloc=$mem_size
+            malloc=$mem_size && break
         fi
     done
     if [ -z $malloc ]; then
