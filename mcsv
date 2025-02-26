@@ -6,12 +6,42 @@ pwd=$PWD
 fddir=/tmp/server@ttasc/mcsv # file descriptor location (std-in/out/err)
 jarfile="mcsv.jar"
 
-die() { echo "$1"; exit 1; }
+die() { printf "\033[31m\033[1m%s\033[m" $1; exit 1; }
 if ! command -v java >/dev/null 2>&1; then die "Java is not installed!"; fi
 
+while getopts 'rdam:' opt; do
+    case "$opt" in
+        r) rmworld=true ;;
+        d) daemon=true ;;
+        a) attach=true ;;
+        m)
+            malloc=${OPTARG}
+        ;;
+        *) echo "Invalid option!" ;;
+    esac
+done
+shift $((OPTIND-1))
+
+if [ -z $malloc ]; then
+    printf "You do not provide a RAM size to the server.\nSo the script will use an amount of RAM\nless than or equal to the system's maximum RAM."
+    echo "You can use \`-m <mem_size_in_MB>\` to specify amount of RAM to allocation for server."
+    real_mem_size="$(sed 1q /proc/meminfo | tr -s ' ' | cut -d' ' -f2)"
+    real_mem_size=$((real_mem_size/1024))
+    list_mem_size="131072 65536 32768 16384 12288 10240 8192 6144 4096 2048 1024"
+    for mem_size in $list_mem_size; do
+        if [ $real_mem_size -ge $mem_size ]; then
+            malloc=$mem_size
+        fi
+    done
+    if [ -z $malloc ]; then
+        die "ERROR: unable to allocate RAM to server!"
+    fi
+    printf "\033[32m\033[1mUse %s of RAM for server\033[m" $malloc
+fi
+
 opts="
--Xmx4096M
--Xms4096M
+-Xmx${malloc}M
+-Xms${malloc}M
 -XX:+AlwaysPreTouch
 -XX:+DisableExplicitGC
 -XX:+ParallelRefProcEnabled
@@ -34,16 +64,6 @@ opts="
 -Daikars.new.flags=true
 "
 start_server="java $opts -jar $jarfile nogui"
-
-while getopts 'rda' opt; do
-    case "$opt" in
-        r) rmworld=true ;;
-        d) daemon=true ;;
-        a) attach=true ;;
-        *) echo "Invalid option!" ;;
-    esac
-done
-shift $((OPTIND-1))
 
 if [ "$attach" = true ]; then
     if ! pid="$(pgrep -f "$jarfile nogui" 2>/dev/null)"; then
