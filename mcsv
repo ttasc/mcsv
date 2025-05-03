@@ -85,7 +85,12 @@ else
     if [ ! -f "$jardir/$jarfile" ]; then die "Please specify Server version (the name of the folder contain $jarfile file)"; fi
     cd "$jardir"
     if [ "$rmworld" = true ];then
-        rm -rfv ops.json permissions.yml usercache.json world*
+        printf "Do you want to remove this old world? (y/N)"
+        read -r ans
+        case $ans in
+            [Yy]* ) rm -rfv ops.json permissions.yml usercache.json world* ;;
+            ""|* ) exit 1 ;;
+        esac
     fi
     if [ "$daemon" = true ]; then
         mkdir -p "$fddir"
