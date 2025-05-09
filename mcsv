@@ -24,7 +24,7 @@ while getopts 'rdam:' opt; do
 done
 shift $((OPTIND-1))
 
-get_full_cmd() {
+get_malloc() {
     real_mem_size="$(sed 1q /proc/meminfo | tr -s ' ' | cut -d' ' -f2)"
     real_mem_size=$((real_mem_size/1024))
     if [ -z $malloc ]; then
@@ -44,8 +44,6 @@ get_full_cmd() {
     if [ $malloc -gt $real_mem_size ] || [ $malloc -lt 1024 ]; then
         die "Can't start server with allocated RAM: $malloc"
     fi
-    opts="-Xmx${malloc}M -Xms${malloc}M -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -XX:+PerfDisableSharedMem -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1HeapRegionSize=8M -XX:G1HeapWastePercent=5 -XX:G1MaxNewSizePercent=40 -XX:G1MixedGCCountTarget=4 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1NewSizePercent=30 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=15 -XX:MaxGCPauseMillis=200 -XX:MaxTenuringThreshold=1 -XX:SurvivorRatio=32 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true"
-    printf "java %s -jar %s nogui" $opts $jarfile
 }
 
 if [ "$attach" = true ]; then
@@ -80,7 +78,10 @@ else
         esac
     fi
 
-    start_server_cmd="$(get_full_cmd)"
+    get_malloc
+
+    opts="-Xmx${malloc}M -Xms${malloc}M -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -XX:+PerfDisableSharedMem -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1HeapRegionSize=8M -XX:G1HeapWastePercent=5 -XX:G1MaxNewSizePercent=40 -XX:G1MixedGCCountTarget=4 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1NewSizePercent=30 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=15 -XX:MaxGCPauseMillis=200 -XX:MaxTenuringThreshold=1 -XX:SurvivorRatio=32 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true"
+    start_server_cmd="java $opts -jar $jarfile nogui"
 
     if [ "$daemon" = true ]; then
         mkdir -p "$fddir"
