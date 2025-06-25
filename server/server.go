@@ -63,14 +63,16 @@ func (s *Server) CloseServer() {
 
 func handleConnections(conn net.Conn, w io.Writer, r io.Reader) {
     defer conn.Close()
-    go readFromClientAndWriteToInput(conn, w)
-    readOutputAndWriteToClients(conn, r)
+    go readOutputAndWriteToClients(conn, r)
+    readFromClientAndWriteToInput(conn, w)
 }
 
 func readFromClientAndWriteToInput(conn net.Conn, w io.Writer) {
-    message := make([]byte, 4096)
     for {
+        message := make([]byte, 4096)
+
         mutex.Lock()
+
         n, err := conn.Read(message)
         if err != nil {
             break
@@ -81,6 +83,7 @@ func readFromClientAndWriteToInput(conn net.Conn, w io.Writer) {
         if err != nil {
             break
         }
+
         mutex.Unlock()
     }
 }

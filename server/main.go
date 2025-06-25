@@ -19,49 +19,54 @@ var (
 
 func main() {
     var (
-        interactive = flag.Bool  ("i"   , false     , "Keep STDIN open")
-        verbose     = flag.Bool  ("v"   , false     , "Enable verbose logging to STDIN")
-        socket      = flag.Bool  ("s"   , false     , "Run the server using a unix socket")
-        rootDir     = flag.String("dir" , "."       , "Specifies the root directory containing the server's data and server .jar file")
-        javaCmd     = flag.String("java", "java"    , "Specify java command")
-        javaMem     = flag.Int   ("mem" , 2048      , "Specifies the amount of memory to allocate to the minecraft server in MB")
-        jarFile     = flag.String("jar" , ""        , "Specify the jar file name to launch. It must be in the root directory")
-        jarOpts     = flag.String("opts", "--nogui" , "Specifies additional options to pass to the minecraft server")
+        flag_interactive = flag.Bool  ("i"   , false     , "Keep STDIN open")
+        flag_verbose     = flag.Bool  ("v"   , false     , "Enable verbose logging to STDIN")
+        flag_socket      = flag.Bool  ("s"   , false     , "Run the server using a unix socket")
+        flag_rootDir     = flag.String("dir" , "."       , "Specifies the root directory containing the server's data and server .jar file")
+        flag_javaCmd     = flag.String("java", "java"    , "Specify java command")
+        flag_javaMem     = flag.Int   ("mem" , 2048      , "Specifies the amount of memory to allocate to the minecraft server in MB")
+        flag_jarFile     = flag.String("jar" , ""        , "Specify the jar file name to launch. It must be in the root directory")
+        flag_jarOpts     = flag.String("opts", "--nogui" , "Specifies additional options to pass to the minecraft server")
     )
 
     flag.Parse()
 
-    if *jarFile == "" {
+    if *flag_jarFile == "" {
         fmt.Println("No jar file specified. Please provide a jar file using the -jar flag")
         return
     }
 
     defaultArgs := "-XX:+AlwaysPreTouch -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -XX:+PerfDisableSharedMem -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1HeapRegionSize=8M -XX:G1HeapWastePercent=5 -XX:G1MaxNewSizePercent=40 -XX:G1MixedGCCountTarget=4 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1NewSizePercent=30 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=15 -XX:MaxGCPauseMillis=200 -XX:MaxTenuringThreshold=1 -XX:SurvivorRatio=32 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true"
     javaArgs := defaultArgs
-    if *javaMem > 0 {
-        javaArgs = fmt.Sprintf("-Xmx%dM -Xms%dM %s", *javaMem, *javaMem, defaultArgs)
+    if *flag_javaMem > 0 {
+        javaArgs = fmt.Sprintf("-Xmx%dM -Xms%dM %s", *flag_javaMem, *flag_javaMem, defaultArgs)
     }
 
     // Create a command to launch the minecraft server
-    cmd, err := NewMCcmd(*rootDir, *javaCmd, javaArgs, *jarFile, *jarOpts)
+    cmd, err := NewMCcmd(*flag_rootDir, *flag_javaCmd, javaArgs, *flag_jarFile, *flag_jarOpts)
     if err != nil { log.Fatal(err); return }
     defer cmd.CloseIO()
 
-    // Handle Standard I/O if run as a daemon
-    if *interactive {
+    tmpr, tmpw, err := os.Pipe()
+    if err != nil { log.Fatal(err); return }
+
+    // Handle Standard I/O
+    if *flag_interactive {
         go io.Copy(cmd.stdin, os.Stdin)
     }
-    if *verbose {
-        go io.Copy(os.Stdout, cmd.stdout)
+    if *flag_verbose {
+        go io.Copy(io.MultiWriter(os.Stdout, tmpw), cmd.stdout)
+    } else {
+        tmpr = cmd.stdout
     }
 
     var server *Server
-    if *socket {
+    if *flag_socket {
         // Creat a unix socket server
-        server, err = NewUnixSocketServer(cmd.stdin, cmd.stdout)
+        server, err = NewUnixSocketServer(cmd.stdin, tmpr)
         if err != nil { log.Fatal(err); return }
         defer server.CloseServer()
-        // Handle Socket I/O
+        // Handle Socket I/O and communicate with clients
         go server.Serve()
     }
 
