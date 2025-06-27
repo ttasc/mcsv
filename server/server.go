@@ -1,3 +1,4 @@
+// vim: foldmethod=indent
 package main
 
 import (
@@ -113,7 +114,7 @@ func (s *Server) broadcast(r io.Reader) {
                 log.Println("broadcast write:", err)
             }
             /*
-                TODO: Multi-Thread still not working
+                TODO: Multi-Thread still not work
                 When one client send incorret command to MC
                 Only the client sender itself receives the message in wrong order
             */

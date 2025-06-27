@@ -1,3 +1,4 @@
+// vim: foldmethod=indent
 package main
 
 import (

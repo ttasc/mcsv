@@ -1,3 +1,4 @@
+// vim: foldmethod=indent
 package main
 
 import (
@@ -35,11 +36,19 @@ func (c *MCcmd) Launch() error {
 }
 
 func (c *MCcmd) StopProcess() {
+    done := make(chan bool)
+    go func() {
+        select {
+        case <-done:
+            return
+        case <-time.After(5*time.Second):
+            if c.Process != nil {
+                c.Process.Signal(os.Kill)
+            }
+        }
+    }()
     c.Process.Signal(syscall.SIGINT)
     c.Wait()
-    if c.Process != nil {
-        <-time.After(time.Second)
-        c.Process.Signal(os.Kill)
-    }
+    done <- true
 }
 
