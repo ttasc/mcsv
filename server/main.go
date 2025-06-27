@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 )
 
 var (
@@ -17,85 +19,81 @@ var (
     waitgroup sync.WaitGroup
 )
 
+const (
+    SocketFileName = "mcsv.sock"
+)
+
 func main() {
-    var (
-        flag_interactive = flag.Bool  ("i"   , false     , "Keep STDIN open")
-        flag_verbose     = flag.Bool  ("v"   , false     , "Enable verbose logging to STDIN")
-        flag_socket      = flag.Bool  ("s"   , false     , "Run the server using a unix socket")
-        flag_rootDir     = flag.String("dir" , "."       , "Specifies the root directory containing the server's data and server .jar file")
-        flag_javaCmd     = flag.String("java", "java"    , "Specify java command")
-        flag_javaMem     = flag.Int   ("mem" , 2048      , "Specifies the amount of memory to allocate to the minecraft server in MB")
-        flag_jarFile     = flag.String("jar" , ""        , "Specify the jar file name to launch. It must be in the root directory")
-        flag_jarOpts     = flag.String("opts", "--nogui" , "Specifies additional options to pass to the minecraft server")
-    )
+    args := SetFlags()
 
-    flag.Parse()
-
-    if *flag_jarFile == "" {
-        fmt.Println("No jar file specified. Please provide a jar file using the -jar flag")
+    if err := args.Validate(); err != nil {
+        fmt.Printf("Error:\n\t%s\n\n", err)
+        flag.Usage()
         return
     }
 
-    defaultArgs := "-XX:+AlwaysPreTouch -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -XX:+PerfDisableSharedMem -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1HeapRegionSize=8M -XX:G1HeapWastePercent=5 -XX:G1MaxNewSizePercent=40 -XX:G1MixedGCCountTarget=4 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1NewSizePercent=30 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=15 -XX:MaxGCPauseMillis=200 -XX:MaxTenuringThreshold=1 -XX:SurvivorRatio=32 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true"
-    javaArgs := defaultArgs
-    if *flag_javaMem > 0 {
-        javaArgs = fmt.Sprintf("-Xmx%dM -Xms%dM %s", *flag_javaMem, *flag_javaMem, defaultArgs)
+    // Create a log logFile
+    logFile, err := os.OpenFile("gova.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+    if err != nil {
+        log.Fatal("Failed to open log file:", err)
+        return
     }
+    defer logFile.Close()
+    logOutput := io.MultiWriter(logFile, os.Stdout)
+    // Set output of logs to file
+    log.SetOutput(logOutput)
+
+    // Add memory arguments to the java command
+    javaArgs := fmt.Sprintf("-Xmx%dM -Xms%dM %s", *args.javaMem, *args.javaMem, "-XX:+AlwaysPreTouch -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -XX:+PerfDisableSharedMem -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1HeapRegionSize=8M -XX:G1HeapWastePercent=5 -XX:G1MaxNewSizePercent=40 -XX:G1MixedGCCountTarget=4 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1NewSizePercent=30 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=15 -XX:MaxGCPauseMillis=200 -XX:MaxTenuringThreshold=1 -XX:SurvivorRatio=32 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true")
 
     // Create a command to launch the minecraft server
-    cmd, err := NewMCcmd(*flag_rootDir, *flag_javaCmd, javaArgs, *flag_jarFile, *flag_jarOpts)
-    if err != nil { log.Fatal(err); return }
-    defer cmd.CloseIO()
-
-    tmpr, tmpw, err := os.Pipe()
+    cmd, err := NewMCcmd(*args.rootDir, *args.javaCmd, javaArgs, *args.jarFile, *args.jarOpts)
     if err != nil { log.Fatal(err); return }
 
-    // Handle Standard I/O
-    if *flag_interactive {
-        go io.Copy(cmd.stdin, os.Stdin)
-    }
-    if *flag_verbose {
-        go io.Copy(io.MultiWriter(os.Stdout, tmpw), cmd.stdout)
-    } else {
-        tmpr = cmd.stdout
+    // Create the server
+    server, err := NewServer(cmd)
+    if err != nil { log.Fatal(err); return }
+    procDoneCh := make(chan bool, 1) // Create a done channel to signal when the process is done
+    waitgroup.Add(1)
+    go gracefulShutdown(cmd, server, logFile, procDoneCh)
+
+    switch {
+    case *args.interactive:
+        cmd.Stdin = os.Stdin
+        cmd.Stdout = os.Stdout
+    case *args.socket:
+        go func() {
+            fmt.Printf("Unix-Socket listening on: %s/%s\n\n", server.socketDir, SocketFileName)
+            err = server.ListenAndServe()
+            if err != nil && err != http.ErrServerClosed {
+                panic(fmt.Sprintf("http server error: %s", err))
+            }
+        }()
     }
 
-    var server *Server
-    if *flag_socket {
-        // Creat a unix socket server
-        server, err = NewUnixSocketServer(cmd.stdin, tmpr)
-        if err != nil { log.Fatal(err); return }
-        defer server.CloseServer()
-        // Handle Socket I/O and communicate with clients
-        go server.Serve()
-    }
+    // Countdown to start server
+    // countdown()
 
     // Launch the minecraft server
-    proc, err := cmd.Launch()
+    err = cmd.Launch()
     if err != nil { log.Fatal(err); return }
-    defer proc.StopProcess()
-
-    // Create a procDoneCh channel to signal when the shutdown is complete
-    procDoneCh := make(chan bool, 1)
+    defer cmd.StopProcess()
 
     waitgroup.Add(1)
-    go gracefulShutdown(cmd, proc, server, procDoneCh)
-
-    waitgroup.Add(1)
-    wait(proc, procDoneCh)
+    wait(cmd, procDoneCh)
 
     waitgroup.Wait()
 
     log.Println("Graceful shutdown complete.")
 }
 
-func wait(proc *Process, done chan bool) {
+func wait(cmd *MCcmd, done chan bool) {
     defer waitgroup.Done()
-    proc.Wait()
+    cmd.Wait()
     done <- true
 }
 
-func gracefulShutdown(cmd *MCcmd, proc *Process, server *Server, done chan bool) {
+func gracefulShutdown(cmd *MCcmd, server *Server, logFile *os.File, done chan bool) {
     defer waitgroup.Done()
 
     // Create context that listens for the interrupt signal from the OS.
@@ -105,18 +103,38 @@ func gracefulShutdown(cmd *MCcmd, proc *Process, server *Server, done chan bool)
     select {
     // Listen for the interrupt signal.
     case <-ctx.Done():
+        log.Println("\nShutting down...")
+
         log.Println("Stopping minecraft server")
-        proc.StopProcess()
-        proc.Wait()
+        if cmd.Process != nil {
+            cmd.StopProcess()
+        }
 
-        log.Println("Closing IO file")
-        cmd.CloseIO()
-
-        log.Println("Closing unix socket server")
+        log.Println("Closing unix socket")
         if server != nil {
             server.CloseServer()
         }
+
+        log.Println("Closing log file")
+        if logFile != nil {
+            logFile.Close()
+        }
+
     case <-done:
+        log.Println("Closing unix socket")
+        if server != nil {
+            server.CloseServer()
+        }
         return
     }
+}
+
+func countdown() {
+    time.Sleep(time.Second)
+    print("Starting server in... ")
+    for i := 10; i > 0; i-- {
+        time.Sleep(time.Second)
+        print(i, " ")
+    }
+    println("\nGo!")
 }
