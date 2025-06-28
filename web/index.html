@@ -3,21 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Server Manager</title>
-    <link href="icon.png" rel="shortcut icon" type="image/x-icon" />
-
+    <title>Quản lý Server Minecraft</title>
+    <link rel="icon" type="image/x-icon" href="icon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="light-mode">
     <div class="container">
         <!-- Sidebar chứa danh sách server -->
         <div class="sidebar">
             <div class="sidebar-header">
                 <h2 onclick="location.reload()">Minecraft Servers</h2>
+                <div class="theme-toggle">
+                    <button class="theme-btn" id="theme-toggle">
+                        <i class="fas fa-moon"></i>
+                        <span>Chế độ tối</span>
+                    </button>
+                </div>
             </div>
 
             <ul class="server-list">
-                <li class="server-item active" data-id="1">
+                <li class="server-item" data-id="1">
                     <div class="server-name">Survival World</div>
                 </li>
                 <li class="server-item" data-id="2">
@@ -32,7 +38,7 @@
             </ul>
 
             <!-- <button class="add-server"> -->
-            <!--     <i>+</i> Add Server -->
+            <!--     <i class="fas fa-plus"></i> Thêm Server -->
             <!-- </button> -->
         </div>
 
@@ -40,7 +46,7 @@
         <div class="main-content">
             <!-- Màn hình khi chưa chọn server -->
             <div class="no-server">
-                <i>☁</i>
+                <i class="fas fa-cloud"></i>
                 <h2>Chào mừng đến với Minecraft Server Manager</h2>
                 <p>Vui lòng chọn một server từ danh sách bên trái để bắt đầu quản lý. Tại đây bạn có thể khởi động/dừng server, xem log, và gửi lệnh điều khiển.</p>
             </div>
@@ -73,18 +79,18 @@
                 </div>
 
                 <div class="command-container">
-                    <input type="text" class="command-input" placeholder="Enter command here...">
-                    <button class="send-button">Send</button>
+                    <input type="text" class="command-input" placeholder="Nhập lệnh điều khiển server...">
+                    <button class="send-button">Gửi</button>
                 </div>
 
                 <div class="actions-container">
                     <button class="toggle-button">
-                        <i>▶</i> Start Server
+                        <i class="fas fa-play"></i> Khởi động Server
                     </button>
 
                     <div class="world-option">
                         <input type="checkbox" id="new-world">
-                        <label for="new-world">Create new world</label>
+                        <label for="new-world">Tạo thế giới mới</label>
                     </div>
                 </div>
             </div>
@@ -92,7 +98,7 @@
     </div>
 
     <div class="footer">
-        Minecraft Server Manager &copy; 2025 | Manage your Minecraft Server like a pro
+        Minecraft Server Manager &copy; 2025 | Quản lý server Minecraft của bạn một cách dễ dàng
     </div>
 
     <script src="script.js"></script>

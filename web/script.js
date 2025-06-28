@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const logContainer = document.querySelector('.log-container');
     const commandInput = document.querySelector('.command-input');
     const sendButton = document.querySelector('.send-button');
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const themeIcon = themeToggleBtn.querySelector('i');
+    const themeText = themeToggleBtn.querySelector('span');
 
     // Dữ liệu giả lập cho các server
     const servers = {
@@ -18,6 +21,36 @@ document.addEventListener('DOMContentLoaded', function() {
         3: { name: "SkyBlock Challenge", status: "running" },
         4: { name: "Hardcore Mode", status: "stopped" }
     };
+
+    // Kiểm tra theme trong localStorage
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        document.body.className = savedTheme;
+        updateThemeButton();
+    }
+
+    // Xử lý sự kiện chuyển đổi theme
+    themeToggleBtn.addEventListener('click', function() {
+        if (document.body.classList.contains('light-mode')) {
+            document.body.classList.remove('light-mode');
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+            document.body.classList.add('light-mode');
+        }
+        localStorage.setItem('theme', document.body.className);
+        updateThemeButton();
+    });
+
+    function updateThemeButton() {
+        if (document.body.classList.contains('dark-mode')) {
+            themeIcon.className = 'fas fa-sun';
+            themeText.textContent = 'Chế độ sáng';
+        } else {
+            themeIcon.className = 'fas fa-moon';
+            themeText.textContent = 'Chế độ tối';
+        }
+    }
 
     // Xử lý sự kiện khi chọn server
     serverItems.forEach(item => {
@@ -41,12 +74,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (server.status === 'running') {
                 serverStatus.textContent = 'Running';
                 serverStatus.className = 'server-status status-running';
-                toggleButton.innerHTML = '<i>⏹</i> Stop Server';
+                toggleButton.innerHTML = '<i class="fas fa-stop"></i> Dừng Server';
                 toggleButton.classList.add('stop');
             } else {
                 serverStatus.textContent = 'Stopped';
                 serverStatus.className = 'server-status status-stopped';
-                toggleButton.innerHTML = '<i>▶</i> Start Server';
+                toggleButton.innerHTML = '<i class="fas fa-play"></i> Khởi động Server';
                 toggleButton.classList.remove('stop');
             }
         });
@@ -58,7 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Đang chạy -> dừng
             serverStatus.textContent = 'Stopped';
             serverStatus.className = 'server-status status-stopped';
-            this.innerHTML = '<i>▶</i> Start Server';
+            this.innerHTML = '<i class="fas fa-play"></i> Khởi động Server';
             this.classList.remove('stop');
 
             // Thêm log
@@ -67,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Đang dừng -> khởi động
             serverStatus.textContent = 'Running';
             serverStatus.className = 'server-status status-running';
-            this.innerHTML = '<i>⏹</i> Stop Server';
+            this.innerHTML = '<i class="fas fa-stop"></i> Dừng Server';
             this.classList.add('stop');
 
             // Kiểm tra có tạo thế giới mới không
@@ -102,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     addLogLine('Server stopped');
                     serverStatus.textContent = 'Stopped';
                     serverStatus.className = 'server-status status-stopped';
-                    toggleButton.innerHTML = '<i>▶</i> Start Server';
+                    toggleButton.innerHTML = '<i class="fas fa-play"></i> Khởi động Server';
                     toggleButton.classList.remove('stop');
                 }, 1000);
             } else {
@@ -129,6 +162,6 @@ document.addEventListener('DOMContentLoaded', function() {
         logContainer.scrollTop = logContainer.scrollHeight;
     }
 
-    // Chọn server đầu tiên khi tải trang
+    // // Chọn server đầu tiên khi tải trang
     // serverItems[0].click();
 });
