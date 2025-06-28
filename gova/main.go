@@ -11,11 +11,9 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 )
 
 var (
-    mutex sync.RWMutex
     waitgroup sync.WaitGroup
 )
 
@@ -27,6 +25,7 @@ func main() {
     args := SetFlags()
 
     if err := args.Validate(); err != nil {
+        fmt.Println("gova [-i] [-s] [-d <root directory>] [-c <java command>] [-m <memory in MB>] [-j <jar file>] [-o <jar options>]")
         fmt.Printf("Error:\n\t%s\n\n", err)
         flag.Usage()
         return
@@ -70,9 +69,6 @@ func main() {
             }
         }()
     }
-
-    // Countdown to start server
-    // countdown()
 
     // Launch the minecraft server
     err = cmd.Launch()
@@ -121,20 +117,6 @@ func gracefulShutdown(cmd *MCcmd, server *Server, logFile *os.File, done chan bo
         }
 
     case <-done:
-        log.Println("Closing unix socket")
-        if server != nil {
-            server.CloseServer()
-        }
         return
     }
-}
-
-func countdown() {
-    time.Sleep(time.Second)
-    print("Starting server in... ")
-    for i := 10; i > 0; i-- {
-        time.Sleep(time.Second)
-        print(i, " ")
-    }
-    println("\nGo!")
 }

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Server Manager</title>
+    <link href="icon.png" rel="shortcut icon" type="image/x-icon" />
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar chứa danh sách server -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2 onclick="location.reload()">Minecraft Servers</h2>
+            </div>
+
+            <ul class="server-list">
+                <li class="server-item active" data-id="1">
+                    <div class="server-name">Survival World</div>
+                </li>
+                <li class="server-item" data-id="2">
+                    <div class="server-name">Creative Paradise</div>
+                </li>
+                <li class="server-item" data-id="3">
+                    <div class="server-name">SkyBlock Challenge</div>
+                </li>
+                <li class="server-item" data-id="4">
+                    <div class="server-name">Hardcore Mode</div>
+                </li>
+            </ul>
+
+            <!-- <button class="add-server"> -->
+            <!--     <i>+</i> Add Server -->
+            <!-- </button> -->
+        </div>
+
+        <!-- Phần nội dung chính -->
+        <div class="main-content">
+            <!-- Màn hình khi chưa chọn server -->
+            <div class="no-server">
+                <i>☁</i>
+                <h2>Chào mừng đến với Minecraft Server Manager</h2>
+                <p>Vui lòng chọn một server từ danh sách bên trái để bắt đầu quản lý. Tại đây bạn có thể khởi động/dừng server, xem log, và gửi lệnh điều khiển.</p>
+            </div>
+
+            <!-- Giao diện quản lý server (ban đầu ẩn) -->
+            <div class="server-management">
+                <div class="server-header">
+                    <h1 class="server-title">Survival World</h1>
+                    <div class="server-status status-stopped">Stopped</div>
+                </div>
+
+                <div class="log-container">
+                    <div class="log-line"><span class="log-time">[12:30:45]</span> Starting server...</div>
+                    <div class="log-line"><span class="log-time">[12:30:47]</span> Loading properties</div>
+                    <div class="log-line"><span class="log-time">[12:30:49]</span> Generating keypair</div>
+                    <div class="log-line"><span class="log-time">[12:30:51]</span> Preparing level "world"</div>
+                    <div class="log-line"><span class="log-time">[12:30:55]</span> Preparing spawn area: 0%</div>
+                    <div class="log-line"><span class="log-time">[12:30:58]</span> Preparing spawn area: 10%</div>
+                    <div class="log-line"><span class="log-time">[12:31:02]</span> Preparing spawn area: 45%</div>
+                    <div class="log-line"><span class="log-time">[12:31:05]</span> Preparing spawn area: 78%</div>
+                    <div class="log-line"><span class="log-time">[12:31:08]</span> Preparing spawn area: 100%</div>
+                    <div class="log-line"><span class="log-time">[12:31:10]</span> Done (15.234s)! For help, type "help"</div>
+                    <div class="log-line"><span class="log-time">[12:35:22]</span> Player Steve joined the game</div>
+                    <div class="log-line"><span class="log-time">[12:38:45]</span> Player Alex joined the game</div>
+                    <div class="log-line"><span class="log-time">[12:45:30]</span> Stopping server...</div>
+                    <div class="log-line"><span class="log-time">[12:45:32]</span> Saving players</div>
+                    <div class="log-line"><span class="log-time">[12:45:34]</span> Saving worlds</div>
+                    <div class="log-line"><span class="log-time">[12:45:36]</span> Saving chunks for level 'world'/overworld</div>
+                    <div class="log-line"><span class="log-time">[12:45:40]</span> Server stopped</div>
+                </div>
+
+                <div class="command-container">
+                    <input type="text" class="command-input" placeholder="Enter command here...">
+                    <button class="send-button">Send</button>
+                </div>
+
+                <div class="actions-container">
+                    <button class="toggle-button">
+                        <i>▶</i> Start Server
+                    </button>
+
+                    <div class="world-option">
+                        <input type="checkbox" id="new-world">
+                        <label for="new-world">Create new world</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Minecraft Server Manager &copy; 2025 | Manage your Minecraft Server like a pro
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

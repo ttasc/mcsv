@@ -1,4 +1,3 @@
-// vim: foldmethod=indent
 package main
 
 import (
@@ -64,7 +63,7 @@ func (s *Server) Serve() error {
             if strings.Contains(err.Error(), "use of closed network connection") {
                 break
             }
-            log.Println("Unix-Socket: Accept Failed:", err)
+            log.Println("Unix-Socket accept failed:", err)
             continue
         }
         s.Clients[conn] = true
@@ -93,16 +92,11 @@ func (s *Server) getInputFromClients(conn net.Conn, w io.Writer) {
         if err != nil {
             break
         }
-
-        mutex.Lock()
-
         _, err = w.Write(buf[:n])
         if err != nil {
-            log.Println("write to cmd stdin:", err)
+            log.Println("Failed to write to cmd stdin:", err)
             break
         }
-
-        mutex.Unlock()
     }
 }
 
@@ -111,7 +105,7 @@ func (s *Server) broadcast(r io.Reader) {
     for scanner.Scan() {
         for conn := range s.Clients {
             if _, err := conn.Write(append(scanner.Bytes(), '\n')); err != nil {
-                log.Println("broadcast write:", err)
+                log.Println("Broadcast Failed:", err)
             }
             /*
                 TODO: Multi-Thread still not work
@@ -123,13 +117,13 @@ func (s *Server) broadcast(r io.Reader) {
             //     buf := make([]byte, len(msg))
             //     copy(buf, msg)
             //     if _, err := conn.Write(buf); err != nil {
-            //         log.Println("broadcast write:", err)
+            //         log.Println("Broadcast Failed:", err)
             //     }
             // }(conn)
         }
     }
     if scanner.Err() != nil {
-        log.Println("Bradcast: scan:", scanner.Err())
+        log.Println("Broadcast Failed (scan):", scanner.Err())
     }
 }
 

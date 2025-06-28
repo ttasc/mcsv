@@ -1,9 +1,9 @@
-all: build scp
+all: server scp
 
-build:
+server:
 	@echo "Building..."
 
-	@go build -o bin/gova ./server
+	@go build -o bin/gova ./src/server
 
 scp:
 	@echo "Copying to server (tailscale)..."
@@ -15,4 +15,4 @@ scp:
 # 	@echo "Cleaning..."
 # 	@rm -f bin/main
 
-.PHONY: all build scp
+.PHONY: all server scp
