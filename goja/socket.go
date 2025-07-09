@@ -5,49 +5,36 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 	"strings"
 	"sync"
 )
 
-type unixSocket struct {
-    listener    net.Listener
-    socketDir   string
-}
-
 type Clients map[net.Conn]bool
 
-type Server struct {
-    unixSocket
-    Clients Clients
+type Socket struct {
+    listener    net.Listener
+    clients     Clients
 
-    mutex sync.RWMutex
+    mutex       sync.RWMutex
 
-    writer io.Writer
-    reader io.Reader
+    writer      io.Writer
+    reader      io.Reader
 }
 
-func NewServer(cmd *MCcmd) (*Server, error) {
+func NewSocket(cmd *MCcmd) (*Socket, error) {
     cmdOutputPipe, err := cmd.StdoutPipe(); if err != nil { return nil, err }
     cmdInputPipe , err := cmd.StdinPipe() ; if err != nil { return nil, err }
 
-    socketDir, err := os.MkdirTemp("", SocketFileName)
-    if err != nil {
-        return nil, err
-    }
-
-    return &Server{
-        unixSocket: unixSocket{ socketDir: socketDir },
+    return &Socket{
         writer: cmdInputPipe,
         reader: cmdOutputPipe,
     }, nil
 }
 
-func (s *Server) ListenAndServe() error {
-    sockfile := s.socketDir + "/mcsv.sock"
-    ln, err := net.Listen("unix", sockfile)
+func (s *Socket) ListenAndServe(socketfile string) error {
+    ln, err := net.Listen("unix", socketfile)
     s.listener = ln
-    s.Clients = make(map[net.Conn]bool)
+    s.clients = make(map[net.Conn]bool)
     if err != nil {
         return err
     }
@@ -55,7 +42,7 @@ func (s *Server) ListenAndServe() error {
     return s.Serve()
 }
 
-func (s *Server) Serve() error {
+func (s *Socket) Serve() error {
     go s.broadcast(s.reader)
     for {
         conn, err := s.listener.Accept()
@@ -66,23 +53,22 @@ func (s *Server) Serve() error {
             log.Println("Unix-Socket accept failed:", err)
             continue
         }
-        s.Clients[conn] = true
+        s.clients[conn] = true
         go s.getInputFromClients(conn, s.writer)
     }
     return nil
 }
 
-func (s *Server) CloseServer() {
+func (s *Socket) CloseSocket() {
     if s.listener != nil {
         s.listener.Close()
     }
-    os.RemoveAll(s.socketDir)
 }
 
-func (s *Server) getInputFromClients(conn net.Conn, w io.Writer) {
+func (s *Socket) getInputFromClients(conn net.Conn, w io.Writer) {
     defer func() {
         s.mutex.Lock()
-        delete(s.Clients, conn)
+        delete(s.clients, conn)
         conn.Close()
         s.mutex.Unlock()
     }()
@@ -100,10 +86,10 @@ func (s *Server) getInputFromClients(conn net.Conn, w io.Writer) {
     }
 }
 
-func (s *Server) broadcast(r io.Reader) {
+func (s *Socket) broadcast(r io.Reader) {
     scanner := bufio.NewScanner(r)
     for scanner.Scan() {
-        for conn := range s.Clients {
+        for conn := range s.clients {
             if _, err := conn.Write(append(scanner.Bytes(), '\n')); err != nil {
                 log.Println("Broadcast Failed:", err)
             }

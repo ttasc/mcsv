@@ -1,18 +1,18 @@
-all: server scp
+all: goja scp
 
-server:
+goja:
 	@echo "Building..."
 
-	@go build -o bin/gova ./src/server
+	@go build -o bin/goja ./goja
 
 scp:
 	@echo "Copying to server (tailscale)..."
 
-	@scp -i ~/.ssh/home bin/gova mcsv@100.101.0.1:~/gova
+	@scp -i ~/.ssh/home bin/goja mcsv@100.101.0.1:~/goja
 
 # Clean the binary
 # clean:
 # 	@echo "Cleaning..."
 # 	@rm -f bin/main
 
-.PHONY: all server scp
+.PHONY: all goja scp

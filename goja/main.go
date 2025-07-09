@@ -6,40 +6,53 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 )
 
-var (
-    waitgroup sync.WaitGroup
-)
+var waitgroup sync.WaitGroup
 
-const (
-    SocketFileName = "mcsv.sock"
+var (
+    appName = "goja"
+    appDir  = ".mcsv"
 )
 
 func main() {
+
     args := SetFlags()
 
     if err := args.Validate(); err != nil {
-        fmt.Println("gova [-i] [-s] [-d <root directory>] [-c <java command>] [-m <memory in MB>] [-j <jar file>] [-o <jar options>]")
+        fmt.Println(appName, " [-i] [-s] [-d <root directory>] [-c <java command>] [-m <memory in MB>] [-j <jar file>] [-o <jar options>]")
         fmt.Printf("Error:\n\t%s\n\n", err)
         flag.Usage()
         return
     }
 
-    // Create a log logFile
-    logFile, err := os.OpenFile("gova.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+    // Create app directory if not exists
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        log.Fatal("Failed to get user home directory:", err)
+        return
+    }
+    appDir := fmt.Sprintf("%s/%s", homeDir, appDir)
+    if _, err := os.Stat(appDir); os.IsNotExist(err) {
+        if err := os.MkdirAll(appDir, 0755); err != nil {
+            log.Fatal("Failed to create app directory:", err)
+            return
+        }
+    }
+
+    // Create a log file
+    logFile, err := os.OpenFile(fmt.Sprintf("%s/%s.log", appDir, appName), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
     if err != nil {
         log.Fatal("Failed to open log file:", err)
         return
     }
     defer logFile.Close()
     logOutput := io.MultiWriter(logFile, os.Stdout)
-    // Set output of logs to file
+    // Set output of logs to file and stdout
     log.SetOutput(logOutput)
 
     // Add memory arguments to the java command
@@ -49,12 +62,12 @@ func main() {
     cmd, err := NewMCcmd(*args.rootDir, *args.javaCmd, javaArgs, *args.jarFile, *args.jarOpts)
     if err != nil { log.Fatal(err); return }
 
-    // Create the server
-    server, err := NewServer(cmd)
+    // Create the socket
+    socket, err := NewSocket(cmd)
     if err != nil { log.Fatal(err); return }
     procDoneCh := make(chan bool, 1) // Create a done channel to signal when the process is done
     waitgroup.Add(1)
-    go gracefulShutdown(cmd, server, logFile, procDoneCh)
+    go gracefulShutdown(cmd, socket, logFile, procDoneCh)
 
     switch {
     case *args.interactive:
@@ -62,11 +75,9 @@ func main() {
         cmd.Stdout = os.Stdout
     case *args.socket:
         go func() {
-            fmt.Printf("Unix-Socket listening on: %s/%s\n\n", server.socketDir, SocketFileName)
-            err = server.ListenAndServe()
-            if err != nil && err != http.ErrServerClosed {
-                panic(fmt.Sprintf("http server error: %s", err))
-            }
+            err = socket.ListenAndServe(fmt.Sprintf("%s/%s.sock", appDir, appName))
+            if err != nil { log.Fatal(err); return }
+            log.Println("Socket server closed")
         }()
     }
 
@@ -89,7 +100,7 @@ func wait(cmd *MCcmd, done chan bool) {
     done <- true
 }
 
-func gracefulShutdown(cmd *MCcmd, server *Server, logFile *os.File, done chan bool) {
+func gracefulShutdown(cmd *MCcmd, socket *Socket, logFile *os.File, done chan bool) {
     defer waitgroup.Done()
 
     // Create context that listens for the interrupt signal from the OS.
@@ -107,8 +118,8 @@ func gracefulShutdown(cmd *MCcmd, server *Server, logFile *os.File, done chan bo
         }
 
         log.Println("Closing unix socket")
-        if server != nil {
-            server.CloseServer()
+        if socket != nil {
+            socket.CloseSocket()
         }
 
         log.Println("Closing log file")
