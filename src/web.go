@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"fmt"
 	"html/template"
 	"io"
 	"log"
@@ -43,7 +44,7 @@ func NewWebServer(config Webconfig, cmd *MinecraftCmd, iFile, oFile string) WebS
 
     // Declare Server config
     server.Server = &http.Server{
-        Addr:         config.Addr,
+        Addr:         fmt.Sprintf(":%d", config.Port),
         Handler:      server.registerHandlers(),
         IdleTimeout:  time.Minute,
         ReadTimeout:  10 * time.Second,

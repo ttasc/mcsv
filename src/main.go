@@ -44,7 +44,7 @@ func main() {
         web := NewWebServer(config.Webserver, mcCmd, fifoFile, logsFile)
         done := make(chan bool, 1) // Create a done channel to signal when the shutdown is complete
         go web.GracefulShutdown(done) // Run graceful shutdown in a separate goroutine
-        fmt.Println("Starting web server on", config.Webserver.Addr)
+        fmt.Println("Starting web server on port", config.Webserver.Port)
         err := web.Server.ListenAndServe()
         if err != nil && err != http.ErrServerClosed {
             panic(fmt.Sprintf("http server error: %s", err))

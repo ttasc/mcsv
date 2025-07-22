@@ -12,7 +12,7 @@ type McConfig struct {
 }
 
 type Webconfig struct {
-    Addr string `json:"addr"`
+    Port int `json:"port"`
 }
 
 type Config struct {
@@ -45,7 +45,7 @@ var configTemplate = `{
         "jar_opts": "--nogui"
     },
     "webserver": {
-        "addr": ":8080"
+        "port": 35565
     }
 }`
 
