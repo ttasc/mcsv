@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="icon" type="image/x-icon" href="web/icon.png">
+    <title>Minecraft Server Control</title>
+    <style>
+      body {
+        font-family: 'Courier New', monospace;
+        background: #1e1e1e;
+        color: #ccc;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .panel {
+        background: #2d2d2d;
+        border: 1px solid #444;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+      }
+
+      h1 {
+        color: #4CAF50;
+        text-align: center;
+        border-bottom: 1px solid #444;
+        padding-bottom: 10px;
+      }
+
+      .status-online { color: #4CAF50; }
+      .status-offline { color: #f44336; }
+
+      button {
+        background: #3a3a3a;
+        color: white;
+        border: 1px solid #555;
+        padding: 8px 15px;
+        cursor: pointer;
+        border-radius: 3px;
+        transition: 0.2s;
+      }
+
+      button:hover {
+        background: #4a4a4a;
+        border-color: #666;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      #console-container {
+        background: #0f0f0f;
+        border: 1px solid #333;
+        margin-top: 5px;
+      }
+
+      #console {
+        color: #ddd;
+        height: 300px;
+        overflow-y: auto;
+        padding: 10px;
+        font-family: monospace;
+        white-space: pre-wrap;
+      }
+
+      #command-line {
+        display: flex;
+        border-top: 1px solid #333;
+        padding: 5px;
+      }
+
+      #commandInput {
+        flex-grow: 1;
+        padding: 8px;
+        background: #0a0a0a;
+        border: none;
+        color: #ddd;
+        font-family: monospace;
+        outline: none;
+      }
+
+      #players {
+        min-height: 30px;
+        padding: 10px;
+        background: #252525;
+        border: 1px solid #333;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>MINECRAFT SERVER CONTROL</h1>
+
+    <div class="panel">
+      Status: <span id="status" class="status-offline">OFFLINE</span>
+      <div class="controls">
+        <button id="startBtn" onclick="startServer()">Start Server</button>
+        <button id="stopBtn" onclick="stopServer()" disabled>Stop Server</button>
+
+        <span id="worldOptions" style="display:none">
+          <input type="checkbox" id="newWorld"> Create new world
+          <button id="backupBtn" onclick="backupWorld()">Backup World</button>
+        </span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Console Output</h3>
+      <div id="console-container">
+        <div id="console">> Server is currently offline</div>
+        <div id="command-line">
+          <input type="text" id="commandInput" placeholder="Enter server command..." disabled
+                                               onkeypress="if(event.key == 'Enter') sendCommand()">
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Online Players (<span id="playerCount">0</span>)</h3>
+      <div id="players">No players online</div>
+    </div>
+
+<script>
+// Server state simulation
+let isRunning = false;
+let players = [];
+
+function logToConsole(message) {
+  const console = document.getElementById('console');
+  console.innerHTML += '> ' + message + '\n';
+  console.scrollTop = console.scrollHeight;
+}
+
+function updateStatus() {
+  const status = document.getElementById('status');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const commandInput = document.getElementById('commandInput');
+  const worldOptions = document.getElementById('worldOptions');
+
+  if (isRunning) {
+    status.textContent = 'ONLINE';
+    status.className = 'status-online';
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    commandInput.disabled = false;
+    worldOptions.style.display = 'none';
+  } else {
+    status.textContent = 'OFFLINE';
+    status.className = 'status-offline';
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    commandInput.disabled = true;
+    worldOptions.style.display = 'inline';
+  }
+}
+
+function startServer() {
+  const createNew = document.getElementById('newWorld').checked;
+  isRunning = true;
+  updateStatus();
+  logToConsole('Starting server...');
+
+  if (createNew) {
+    logToConsole('Creating new world...');
+    document.getElementById('newWorld').checked = false;
+  }
+
+  // Simulate player join
+  setTimeout(() => {
+    players = ['Player1', 'Steverus', 'Miner42'];
+    updatePlayerList();
+    logToConsole('Server started!');
+  }, 1500);
+}
+
+function stopServer() {
+  isRunning = false;
+  updateStatus();
+  logToConsole('Stopping server...');
+
+  // Simulate player leave
+  players = [];
+  updatePlayerList();
+
+  setTimeout(() => {
+    logToConsole('Server stopped');
+  }, 1000);
+}
+
+function backupWorld() {
+  logToConsole('Creating world backup...');
+  setTimeout(() => {
+    logToConsole('Backup created successfully!');
+  }, 2000);
+}
+
+function sendCommand() {
+  const input = document.getElementById('commandInput');
+  const command = input.value.trim();
+
+  if (command) {
+    logToConsole('Command sent: ' + command);
+    input.value = '';
+
+    // Simulate command response
+    if (command === '/list') {
+      setTimeout(() => {
+        logToConsole('There are ' + players.length + ' players online');
+      }, 500);
+    }
+  }
+}
+
+function updatePlayerList() {
+  const container = document.getElementById('players');
+  const count = document.getElementById('playerCount');
+
+  if (players.length > 0) {
+    container.innerHTML = players.join(', ');
+  } else {
+    container.innerHTML = 'No players online';
+  }
+  count.textContent = players.length;
+}
+
+// Initialize
+updateStatus();
+</script>
+</body>
+</html>
