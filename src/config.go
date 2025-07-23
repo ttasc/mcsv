@@ -17,12 +17,14 @@ type Webconfig struct {
 
 type Config struct {
     Minecraft McConfig  `json:"minecraft"`
-    Webserver Webconfig `json:"webserver"`
+    WebServer Webconfig `json:"webserver"`
 }
 
 func ReadConfig(file string) (*Config, error) {
     var config *Config
-    if file == "" {
+
+    _, err := os.Stat("config.json")
+    if file == "" && err != nil {
         config, err := LoadConfigTempl()
         if err != nil { return nil, err }
         return config, WriteConfigTempl(config)

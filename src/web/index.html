@@ -81,13 +81,6 @@
         font-family: monospace;
         outline: none;
       }
-
-      #players {
-        min-height: 30px;
-        padding: 10px;
-        background: #252525;
-        border: 1px solid #333;
-      }
     </style>
   </head>
   <body>
@@ -109,7 +102,7 @@
     <div class="panel">
       <h3>Console Output</h3>
       <div id="console-container">
-        <div id="console">> Server is currently offline</div>
+        <div id="console"> Server is currently offline</div>
         <div id="command-line">
           <input type="text" id="commandInput" placeholder="Enter server command..." disabled
                                                onkeypress="if(event.key == 'Enter') sendCommand()">
@@ -117,15 +110,8 @@
       </div>
     </div>
 
-    <div class="panel">
-      <h3>Online Players (<span id="playerCount">0</span>)</h3>
-      <div id="players">No players online</div>
-    </div>
-
 <script>
-// Server state simulation
 let isRunning = false;
-let players = [];
 
 function logToConsole(message) {
   const console = document.getElementById('console');
@@ -168,10 +154,8 @@ function startServer() {
     document.getElementById('newWorld').checked = false;
   }
 
-  // Simulate player join
+  // Simulate server start
   setTimeout(() => {
-    players = ['Player1', 'Steverus', 'Miner42'];
-    updatePlayerList();
     logToConsole('Server started!');
   }, 1500);
 }
@@ -180,10 +164,6 @@ function stopServer() {
   isRunning = false;
   updateStatus();
   logToConsole('Stopping server...');
-
-  // Simulate player leave
-  players = [];
-  updatePlayerList();
 
   setTimeout(() => {
     logToConsole('Server stopped');
@@ -204,26 +184,7 @@ function sendCommand() {
   if (command) {
     logToConsole('Command sent: ' + command);
     input.value = '';
-
-    // Simulate command response
-    if (command === '/list') {
-      setTimeout(() => {
-        logToConsole('There are ' + players.length + ' players online');
-      }, 500);
-    }
   }
-}
-
-function updatePlayerList() {
-  const container = document.getElementById('players');
-  const count = document.getElementById('playerCount');
-
-  if (players.length > 0) {
-    container.innerHTML = players.join(', ');
-  } else {
-    container.innerHTML = 'No players online';
-  }
-  count.textContent = players.length;
 }
 
 // Initialize

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -29,17 +30,13 @@ const (
 var fs embed.FS
 
 type WebServer struct {
-    cmd   *MinecraftCmd
-    iFile string
-    oFile string
+    mcsv   *MinecraftServer
     Server *http.Server
 }
 
-func NewWebServer(config Webconfig, cmd *MinecraftCmd, iFile, oFile string) WebServer {
+func NewWebServer(config Webconfig, mcsv *MinecraftServer) WebServer {
     server := WebServer{
-        cmd:   cmd,
-        iFile: iFile,
-        oFile: oFile,
+        mcsv:   mcsv,
     }
 
     // Declare Server config
@@ -50,7 +47,6 @@ func NewWebServer(config Webconfig, cmd *MinecraftCmd, iFile, oFile string) WebS
         ReadTimeout:  10 * time.Second,
         WriteTimeout: 30 * time.Second,
     }
-
 
     return server
 }
@@ -81,12 +77,8 @@ func (s *WebServer) GracefulShutdown(done chan bool) {
 
 func (s *WebServer) registerHandlers() http.Handler {
     mux := http.NewServeMux()
-
-    // Register routes
-    s.registerRoutes(mux)
-
-    // Wrap the mux with middleware
-    return s.logMiddleware(s.corsMiddleware(mux))
+    s.registerRoutes(mux) // Register routes
+    return s.logMiddleware(s.corsMiddleware(mux)) // Wrap the mux with middleware
 }
 
 func (s *WebServer) corsMiddleware(next http.Handler) http.Handler {
@@ -118,6 +110,7 @@ func (s *WebServer) logMiddleware(next http.Handler) http.Handler {
 func (s *WebServer) registerRoutes(mux *http.ServeMux) {
     // Static
     mux.Handle("/web/icon.png", http.FileServer(http.FS(fs)))
+
     // Http
     mux.HandleFunc("/",         s.dashboard)
     mux.HandleFunc("/start",    s.start)
@@ -139,7 +132,18 @@ func (s *WebServer) dashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) start(w http.ResponseWriter, r *http.Request) {
-    err := s.cmd.StartCmd(true)
+    newWorld, err := strconv.ParseBool(r.URL.Query().Get("newworld"))
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    if newWorld {
+        if err = s.mcsv.RemoveOldWorld(); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+    }
+    err = s.mcsv.StartMC(true)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
@@ -147,7 +151,7 @@ func (s *WebServer) start(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) stop(w http.ResponseWriter, r *http.Request) {
-    err := s.cmd.StopCmd()
+    err := s.mcsv.StopMC()
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
@@ -155,7 +159,7 @@ func (s *WebServer) stop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) console(w http.ResponseWriter, r *http.Request) {
-    if s.cmd.IsRunning() == false {
+    if !IsMCRunningBackground(s.mcsv.DataPath) {
         w.Write([]byte("Minecraft is not running"))
         return
     }
@@ -170,18 +174,18 @@ func (s *WebServer) console(w http.ResponseWriter, r *http.Request) {
     }
 
     stdoutDone := make(chan struct{})
-    go pumpStdout(ws, s.oFile, stdoutDone)
+    go pumpStdout(ws, s.mcsv.FileO, stdoutDone)
     go ping(ws, stdoutDone)
-    pumpStdin(ws, s.iFile)
+    pumpStdin(ws, s.mcsv.FileI)
 }
 
-func pumpStdin(ws *websocket.Conn, iFile string) {
+func pumpStdin(ws *websocket.Conn, FileI string) {
     defer ws.Close()
     ws.SetReadLimit(maxMessageSize)
     ws.SetReadDeadline(time.Now().Add(pongWait))
     ws.SetPongHandler(func(string) error { ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 
-    w, err := os.OpenFile(iFile, os.O_WRONLY, 0600)
+    w, err := os.OpenFile(FileI, os.O_WRONLY, 0600)
     if err != nil {
         log.Println("ERROR opening file:", err)
         return
@@ -199,14 +203,14 @@ func pumpStdin(ws *websocket.Conn, iFile string) {
     }
 }
 
-func pumpStdout(ws *websocket.Conn, oFile string, done chan struct{}) {
+func pumpStdout(ws *websocket.Conn, FileO string, done chan struct{}) {
     // Open file once for all operations
-    foFile, err := os.Open(oFile)
+    fFileO, err := os.Open(FileO)
     if err != nil {
         log.Println("ERROR opening file:", err)
         return
     }
-    defer foFile.Close()
+    defer fFileO.Close()
 
     // Create file watcher
     watcher, err := fsnotify.NewWatcher()
@@ -217,7 +221,7 @@ func pumpStdout(ws *websocket.Conn, oFile string, done chan struct{}) {
     defer watcher.Close()
 
     // Get initial file size
-    stat, err := foFile.Stat()
+    stat, err := fFileO.Stat()
     if err != nil {
         log.Println("ERROR getting file stats:", err)
         return
@@ -227,7 +231,7 @@ func pumpStdout(ws *websocket.Conn, oFile string, done chan struct{}) {
     // Send initial file content in chunks (memory-efficient)
     buf := make([]byte, 1024)
     for {
-        n, err := foFile.Read(buf)
+        n, err := fFileO.Read(buf)
         if n > 0 {
             ws.SetWriteDeadline(time.Now().Add(writeWait))
             if err := ws.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
@@ -245,14 +249,14 @@ func pumpStdout(ws *websocket.Conn, oFile string, done chan struct{}) {
     }
 
     // Update current position after initial read
-    size, err = foFile.Seek(0, io.SeekCurrent)
+    size, err = fFileO.Seek(0, io.SeekCurrent)
     if err != nil {
         log.Println("ERROR getting file position:", err)
         return
     }
 
     // Start watching for changes
-    if err := watcher.Add(oFile); err != nil {
+    if err := watcher.Add(FileO); err != nil {
         log.Println("ERROR adding watch:", err)
         return
     }
@@ -273,7 +277,7 @@ func pumpStdout(ws *websocket.Conn, oFile string, done chan struct{}) {
             // Handle write events
             case event.Has(fsnotify.Write):
                 // Check for file truncation
-                currentStat, err := foFile.Stat()
+                currentStat, err := fFileO.Stat()
                 if err != nil {
                     log.Println("ERROR checking file stats:", err)
                     break loop
@@ -284,7 +288,7 @@ func pumpStdout(ws *websocket.Conn, oFile string, done chan struct{}) {
                 }
 
                 // Read new content
-                n, err := foFile.Read(buf)
+                n, err := fFileO.Read(buf)
                 if err != nil && err != io.EOF {
                     log.Println("ERROR reading new content:", err)
                     break loop
@@ -302,18 +306,18 @@ func pumpStdout(ws *websocket.Conn, oFile string, done chan struct{}) {
             // Handle file rotation/recreation
             case event.Has(fsnotify.Remove), event.Has(fsnotify.Rename):
                 // Reopen file after rotation
-                foFile.Close()
+                fFileO.Close()
                 for i := range 10 { // Retry with backoff
                     time.Sleep(time.Duration(i*100) * time.Millisecond)
-                    newFile, err := os.Open(oFile)
+                    newFile, err := os.Open(FileO)
                     if err == nil {
-                        foFile = newFile
+                        fFileO = newFile
                         size = 0
-                        watcher.Add(oFile) // Re-add watch
+                        watcher.Add(FileO) // Re-add watch
                         break
                     }
                 }
-                if foFile == nil {
+                if fFileO == nil {
                     log.Println("ERROR reopening file after rotation")
                     break loop
                 }
