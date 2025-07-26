@@ -22,7 +22,7 @@ func ParseFlags() Flags {
         flag.Bool  ("w", false  , "Start a web server for remote control"),
         flag.String("p", ""     , "Specify the Minecraft data path"),
         flag.String("j", ""     , "Specify the jar file"),
-        flag.String("c", ""     , "Specify a configuration file"),
+        flag.String("c", "config.json", "Specify a configuration file"),
     }
     flag.Parse()
     return f

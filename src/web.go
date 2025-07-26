@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -78,7 +77,7 @@ func (s *WebServer) GracefulShutdown(done chan bool) {
 func (s *WebServer) registerHandlers() http.Handler {
     mux := http.NewServeMux()
     s.registerRoutes(mux) // Register routes
-    return s.logMiddleware(s.corsMiddleware(mux)) // Wrap the mux with middleware
+    return s.logMiddleware(s.corsMiddleware(mux)) // Wrap the mux with middlewares
 }
 
 func (s *WebServer) corsMiddleware(next http.Handler) http.Handler {
@@ -115,6 +114,7 @@ func (s *WebServer) registerRoutes(mux *http.ServeMux) {
     mux.HandleFunc("/",         s.dashboard)
     mux.HandleFunc("/start",    s.start)
     mux.HandleFunc("/stop",     s.stop)
+    mux.HandleFunc("/status",   s.status)
     // mux.HandleFunc("/backup",   s.backup)
     // mux.HandleFunc("/players",  s.players)
 
@@ -132,30 +132,39 @@ func (s *WebServer) dashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) start(w http.ResponseWriter, r *http.Request) {
-    newWorld, err := strconv.ParseBool(r.URL.Query().Get("newworld"))
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
+    newWorld := r.URL.Query().Get("newworld") == "true"
     if newWorld {
-        if err = s.mcsv.RemoveOldWorld(); err != nil {
+        if err := RemoveOldWorld(s.mcsv.DataPath); err != nil {
+            log.Println("ERROR removing old world:", err)
             http.Error(w, err.Error(), http.StatusInternalServerError)
             return
         }
     }
-    err = s.mcsv.StartMC(true)
+    err := s.mcsv.StartMCBackground()
     if err != nil {
+        log.Println("ERROR starting Minecraft:", err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
     }
+    w.Write([]byte("started"))
 }
 
 func (s *WebServer) stop(w http.ResponseWriter, r *http.Request) {
     err := s.mcsv.StopMC()
     if err != nil {
+        log.Println("ERROR stopping Minecraft:", err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
     }
+    w.Write([]byte("stopped"))
+}
+
+func (s *WebServer) status(w http.ResponseWriter, r *http.Request) {
+    if IsMCRunningBackground(s.mcsv.DataPath) {
+        w.Write([]byte("true"))
+        return
+    }
+    w.Write([]byte("false"))
 }
 
 func (s *WebServer) console(w http.ResponseWriter, r *http.Request) {
@@ -169,6 +178,7 @@ func (s *WebServer) console(w http.ResponseWriter, r *http.Request) {
     }
     ws, err := upgrader.Upgrade(w, r, nil)
     if err != nil {
+        log.Println("ERROR upgrading websocket:", err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
     }
@@ -185,21 +195,21 @@ func pumpStdin(ws *websocket.Conn, FileI string) {
     ws.SetReadDeadline(time.Now().Add(pongWait))
     ws.SetPongHandler(func(string) error { ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 
-    w, err := os.OpenFile(FileI, os.O_WRONLY, 0600)
-    if err != nil {
-        log.Println("ERROR opening file:", err)
-        return
-    }
 
     for {
-        _, message, err := ws.ReadMessage()
+        _, message, err := ws.ReadMessage(); if err != nil { break }
+
+        w, err := os.OpenFile(FileI, os.O_WRONLY, 0600)
         if err != nil {
+            log.Println("ERROR opening file:", err)
             break
         }
-        message = append(message, '\n')
-        if _, err := w.Write(message); err != nil {
+
+        if _, err := w.Write(append(message, '\n')); err != nil {
             break
         }
+
+        if err := w.Close(); err != nil { break }
     }
 }
 

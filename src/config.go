@@ -20,17 +20,16 @@ type Config struct {
     WebServer Webconfig `json:"webserver"`
 }
 
-func ReadConfig(file string) (*Config, error) {
-    var config *Config
+func ReadConfig(filePath string) (*Config, error) {
+    config := new(Config)
 
-    _, err := os.Stat("config.json")
-    if file == "" && err != nil {
+    if _, err := os.Stat(filePath); err != nil && os.IsNotExist(err) {
         config, err := LoadConfigTempl()
         if err != nil { return nil, err }
-        return config, WriteConfigTempl(config)
+        return config, WriteConfigTempl(filePath, config)
     }
 
-    jsonFile, err := os.Open(file)
+    jsonFile, err := os.Open(filePath)
     if err != nil { return nil, err }
     defer jsonFile.Close()
 
@@ -58,9 +57,9 @@ var configTemplate = `{
     return config, nil
 }
 
-func WriteConfigTempl(config *Config) error {
-    jsonFile, err := os.Create("config.json")
+func WriteConfigTempl(filePath string, config *Config) error {
+    file, err := os.Create(filePath)
     if err != nil { return err }
-    defer jsonFile.Close()
-    return json.NewEncoder(jsonFile).Encode(config)
+    defer file.Close()
+    return json.NewEncoder(file).Encode(config)
 }

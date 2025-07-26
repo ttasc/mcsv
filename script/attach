@@ -1,0 +1,12 @@
+#!/bin/sh
+
+dataDir="$1"
+if [ ! -d "$dataDir" ]; then
+    echo "Please specify a valid data directory"
+    exit 1
+fi
+
+tail -f --pid="$$" "$dataDir"/logs/latest.log &
+while read -r input; do
+    echo "$input" > "$dataDir"/fifo
+done

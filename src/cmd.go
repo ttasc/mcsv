@@ -1,23 +1,27 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 )
 
 type MinecraftServer struct {
     DataPath    string
+    javaCmd     string
+    args        []string
+
     FileI       string
     FileO       string
-
-    tail        *exec.Cmd
-    minecraft   *exec.Cmd
 }
 
 func NewMC(dataPath, jarFile string, config McConfig) (*MinecraftServer, error) {
@@ -29,62 +33,98 @@ func NewMC(dataPath, jarFile string, config McConfig) (*MinecraftServer, error) 
         }
     }
 
-    if IsMCRunningBackground(dataPath) {
-        return &MinecraftServer{
-            dataPath, fifoFile, dataPath + "/logs/latest.log", nil, nil,
-        }, nil
-    }
-
-    tail := exec.Command("tail", "-f", fifoFile)
     args := strings.Split(config.JavaArgs, " ")
     args = append(args, "-jar", jarFile)
     args = append(args, strings.Split(config.JarOpts, " ")...)
-    minecraft := exec.Command(config.JavaCmd, args...)
-    minecraft.Dir = dataPath
+
+    if IsMCRunningBackground(dataPath) {
+        return &MinecraftServer{
+            dataPath, config.JavaCmd, args, fifoFile, dataPath + "/logs/latest.log",
+        }, nil
+    }
 
     return &MinecraftServer{
-        dataPath, fifoFile, dataPath + "/logs/latest.log", tail, minecraft,
+        dataPath, config.JavaCmd, args, fifoFile, dataPath + "/logs/latest.log",
     }, nil
 }
 
-func (c *MinecraftServer) StartMC(detach bool) error {
-    if c.tail == nil || c.minecraft == nil {
-        return errors.New("Minecraft is already running")
-    }
+func (c *MinecraftServer) StartMCForeground() error {
+    minecraft := exec.Command(c.javaCmd, c.args...)
+    minecraft.Dir = c.DataPath
+    minecraft.Stdin = os.Stdin
+    minecraft.Stdout = os.Stdout
 
-    if err := c.pipe(detach); err != nil { return err }
+    procDone, gracDone := make(chan bool, 1), make(chan bool, 1)
+    go gracefulShutdown(minecraft, procDone, gracDone)
 
-    if !detach { return c.minecraft.Run() }
+    err := minecraft.Start(); if err != nil { return err }
+    err = minecraft.Wait()  ; if err != nil { return err }
 
-    if err := c.tail.Start()     ; err != nil { return err }
-    if err := c.minecraft.Start(); err != nil { return err }
+    close(procDone)
+    <-gracDone
 
-    if err := writePIDsToFile(c.DataPath, c.tail.Process.Pid, c.minecraft.Process.Pid)
+    return nil
+}
+
+func (c *MinecraftServer) StartMCBackground() error {
+    tail := exec.Command("tail", "-f", c.FileI)
+    minecraft := exec.Command(c.javaCmd, c.args...)
+    minecraft.Dir = c.DataPath
+
+    var err error
+    minecraft.Stdin, err = tail.StdoutPipe()
+    if err != nil { return err }
+
+    sysProcAttr := &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+    tail.SysProcAttr = sysProcAttr
+    minecraft.SysProcAttr = sysProcAttr
+
+    if err := tail.Start()
+    err != nil { return err }
+    if err := minecraft.Start()
     err != nil { return err }
 
-    return c.detach()
+    if err := writePIDsToFile(c.DataPath, tail.Process.Pid, minecraft.Process.Pid)
+    err != nil { return err }
+
+    if err := tail.Process.Release()
+    err != nil { return err }
+    if err := minecraft.Process.Release()
+    err != nil { return err }
+
+    return nil
 }
 
 func (c *MinecraftServer) StopMC() error {
-    if c.tail == nil && c.minecraft == nil {
-        tailPID, mcPID, err := readPIDsFromFile(c.DataPath); if err != nil { return err }
-        if _, err = os.FindProcess(tailPID); err != nil { return err }
-        if _, err = os.FindProcess(mcPID)  ; err != nil { return err }
-        return nil
-    }
+    tailPID, mcPID, err := readPIDsFromFile(c.DataPath); if err != nil { return err }
 
-    var err error
-    if c.tail.Process != nil {
-        err = errors.Join(c.tail.Process.Signal(syscall.SIGINT))
-    }
-    if c.minecraft.Process != nil {
-        err = errors.Join(c.minecraft.Process.Signal(syscall.SIGINT))
-    }
-    return err
+    tailProc, err := os.FindProcess(tailPID); if err != nil { return err }
+    minecraftProc, err := os.FindProcess(mcPID); if err != nil { return err }
+
+    err = errors.Join(tailProc.Signal(syscall.SIGINT))
+    err = errors.Join(minecraftProc.Signal(syscall.SIGINT))
+    if err != nil { return err }
+
+    return wait(tailProc, minecraftProc)
 }
 
-func (c *MinecraftServer) RemoveOldWorld() error {
-    files, err := filepath.Glob(c.DataPath + "/world*")
+func gracefulShutdown(cmd *exec.Cmd, procDone, gracDone chan bool) {
+    ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+    select {
+    case <-ctx.Done():
+        if cmd.Process != nil {
+            if err := cmd.Process.Signal(syscall.SIGINT); err != nil {
+                log.Printf("Failed to send SIGINT to Minecraft process: %v", err)
+            }
+        }
+    case <-procDone:
+    }
+    gracDone <- true
+}
+
+func RemoveOldWorld(dataPath string) error {
+    files, err := filepath.Glob(dataPath + "/world*")
     if err != nil { return err }
 
     files = append(files, "ops.json")
@@ -104,28 +144,32 @@ func IsMCRunningBackground(dataPath string) bool {
     tailPID, mcPID, err := readPIDsFromFile(dataPath)
     if err != nil { return false }
 
-    _, err = os.FindProcess(tailPID); if err != nil { return false }
-    _, err = os.FindProcess(mcPID)  ; if err != nil { return false }
+    tailProc, err := os.FindProcess(tailPID); if err != nil { return false }
+    if err = tailProc.Signal(syscall.Signal(0)); err != nil { return false }
+    minecraftProc, err := os.FindProcess(mcPID)  ; if err != nil { return false }
+    if err = minecraftProc.Signal(syscall.Signal(0)); err != nil { return false }
 
     return true
 }
 
-func (c *MinecraftServer) pipe(detach bool) error {
-    var err error
-    if detach {
-        c.minecraft.Stdin, err = c.tail.StdoutPipe()
-        return err
-    } else {
-        c.minecraft.Stdin = os.Stdin
-        c.minecraft.Stdout = os.Stdout
+func wait(tailProc, minecraftProc *os.Process) error {
+    var wg sync.WaitGroup
+    var tailErr, minecraftErr error
+
+    if tailProc != nil {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            _, tailErr = tailProc.Wait()
+        }()
     }
 
-    return nil
-}
+    if minecraftProc != nil {
+        _, minecraftErr = minecraftProc.Wait()
+    }
 
-func (c *MinecraftServer) detach() error {
-    if err := c.tail.Process.Release(); err != nil { return err }
-    return c.minecraft.Process.Release()
+    wg.Wait()
+    return errors.Join(tailErr, minecraftErr)
 }
 
 func writePIDsToFile(dataPath string, tailPID, minecraftPID int) error {

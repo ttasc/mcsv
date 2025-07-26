@@ -25,9 +25,9 @@ func main() {
 
     switch {
     case *flags.detach:
-        err := mcsv.StartMC(true) // true
+        err := mcsv.StartMCBackground()
         if err != nil {
-            log.Fatal("StartMC error: ", err)
+            log.Fatal("StartMC background error: ", err)
         }
     case *flags.attach:
         // TODO: cli.go
@@ -42,9 +42,9 @@ func main() {
         <-done // Wait for the graceful shutdown to complete
         log.Println("Graceful shutdown complete.")
     default:
-        err := mcsv.StartMC(false)
+        err := mcsv.StartMCForeground()
         if err != nil {
-            log.Fatal("StartMC error: ", err)
+            log.Fatal("StartMC foreground error: ", err)
         }
     }
 }
