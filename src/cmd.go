@@ -132,7 +132,7 @@ func RemoveOldWorld(dataPath string) error {
     files = append(files, "usercaches.json")
 
     for _, f := range files {
-        if err := os.Remove(f); err != nil {
+        if err := os.RemoveAll(f); err != nil {
             return err
         }
     }

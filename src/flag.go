@@ -51,7 +51,7 @@ func (f Flags) Validate() error {
         return err
     }
 
-    if *f.configFile != "" {
+    if *f.configFile != "config.json" {
         if _, err := os.Stat(*f.configFile); err != nil {
             return err
         }
