@@ -295,17 +295,7 @@ async function stopServer() {
 }
 
 function backupWorld() {
-  fetch('/backup')
-    .then(response => {
-      if (!response.ok) throw new Error('Backup failed');
-      return response.text();
-    })
-    .then(data => {
-      logToConsole(data);
-    })
-    .catch(error => {
-      logToConsole('Error: ' + error.message);
-    });
+  // TODO: Implement world backup
 }
 
 function sendCommand() {

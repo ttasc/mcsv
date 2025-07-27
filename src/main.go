@@ -35,7 +35,11 @@ func main() {
         web := NewWebServer(config.WebServer, mcsv)
         done := make(chan bool, 1) // Create a done channel to signal when the shutdown is complete
         go web.GracefulShutdown(done) // Run graceful shutdown in a separate goroutine
-        err := web.Server.ListenAndServe()
+        if config.WebServer.TLS.Enable {
+            err = web.Server.ListenAndServeTLS(config.WebServer.TLS.CertFile, config.WebServer.TLS.KeyFile)
+        } else {
+            err = web.Server.ListenAndServe()
+        }
         if err != nil && err != http.ErrServerClosed {
             log.Fatal("http server error: ", err)
         }

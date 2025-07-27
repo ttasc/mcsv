@@ -11,8 +11,15 @@ type McConfig struct {
     JarOpts string `json:"jar_opts"`
 }
 
+type WebTLS struct {
+    Enable bool `json:"enable"`
+    CertFile string `json:"cert_file"`
+    KeyFile string `json:"key_file"`
+}
+
 type Webconfig struct {
     Port int `json:"port"`
+    TLS WebTLS `json:"tls"`
 }
 
 type Config struct {
@@ -46,7 +53,12 @@ var configTemplate = `{
         "jar_opts": "--nogui"
     },
     "webserver": {
-        "port": 35565
+        "port": 35565,
+        "tls": {
+            "enable": false,
+            "cert_file": "",
+            "key_file": ""
+        }
     }
 }`
 
