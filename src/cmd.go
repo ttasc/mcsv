@@ -15,7 +15,7 @@ import (
 	"syscall"
 )
 
-type MinecraftServer struct {
+type Minecraft struct {
     DataPath    string
     javaCmd     string
     args        []string
@@ -24,7 +24,7 @@ type MinecraftServer struct {
     FileO       string
 }
 
-func NewMC(dataPath, jarFile string, config McConfig) (*MinecraftServer, error) {
+func NewMC(dataPath, jarFile string, config McConfig) (*Minecraft, error) {
     fifoFile := dataPath + "/fifo"
     _, err := os.Stat(fifoFile)
     if err != nil && os.IsNotExist(err) {
@@ -38,17 +38,17 @@ func NewMC(dataPath, jarFile string, config McConfig) (*MinecraftServer, error) 
     args = append(args, strings.Split(config.JarOpts, " ")...)
 
     if IsMCRunningBackground(dataPath) {
-        return &MinecraftServer{
+        return &Minecraft{
             dataPath, config.JavaCmd, args, fifoFile, dataPath + "/logs/latest.log",
         }, nil
     }
 
-    return &MinecraftServer{
+    return &Minecraft{
         dataPath, config.JavaCmd, args, fifoFile, dataPath + "/logs/latest.log",
     }, nil
 }
 
-func (c *MinecraftServer) StartMCForeground() error {
+func (c *Minecraft) StartMCForeground() error {
     minecraft := exec.Command(c.javaCmd, c.args...)
     minecraft.Dir = c.DataPath
     minecraft.Stdin = os.Stdin
@@ -66,7 +66,7 @@ func (c *MinecraftServer) StartMCForeground() error {
     return nil
 }
 
-func (c *MinecraftServer) StartMCBackground() error {
+func (c *Minecraft) StartMCBackground() error {
     tail := exec.Command("tail", "-f", c.FileI)
     minecraft := exec.Command(c.javaCmd, c.args...)
     minecraft.Dir = c.DataPath
@@ -95,7 +95,7 @@ func (c *MinecraftServer) StartMCBackground() error {
     return nil
 }
 
-func (c *MinecraftServer) StopMC() error {
+func (c *Minecraft) StopMC() error {
     tailPID, mcPID, err := readPIDsFromFile(c.DataPath); if err != nil { return err }
 
     tailProc, err := os.FindProcess(tailPID); if err != nil { return err }

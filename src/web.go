@@ -29,17 +29,17 @@ const (
 var fs embed.FS
 
 type WebServer struct {
-    mcsv   *MinecraftServer
-    Server *http.Server
+    Minecraft   *Minecraft
+    Http        *http.Server
 }
 
-func NewWebServer(config Webconfig, mcsv *MinecraftServer) WebServer {
+func NewWebServer(config Webconfig, minecraft *Minecraft) WebServer {
     server := WebServer{
-        mcsv:   mcsv,
+        Minecraft:   minecraft,
     }
 
     // Declare Server config
-    server.Server = &http.Server{
+    server.Http = &http.Server{
         Addr:         fmt.Sprintf(":%d", config.Port),
         Handler:      server.registerHandlers(),
         IdleTimeout:  time.Minute,
@@ -64,7 +64,7 @@ func (s *WebServer) GracefulShutdown(done chan bool) {
     // the request it is currently handling
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
-    if err := s.Server.Shutdown(ctx); err != nil {
+    if err := s.Http.Shutdown(ctx); err != nil {
         log.Printf("Server forced to shutdown with error: %v", err)
     }
 
@@ -134,13 +134,13 @@ func (s *WebServer) dashboard(w http.ResponseWriter, r *http.Request) {
 func (s *WebServer) start(w http.ResponseWriter, r *http.Request) {
     newWorld := r.URL.Query().Get("newworld") == "true"
     if newWorld {
-        if err := RemoveOldWorld(s.mcsv.DataPath); err != nil {
+        if err := RemoveOldWorld(s.Minecraft.DataPath); err != nil {
             log.Println("ERROR removing old world:", err)
             http.Error(w, err.Error(), http.StatusInternalServerError)
             return
         }
     }
-    err := s.mcsv.StartMCBackground()
+    err := s.Minecraft.StartMCBackground()
     if err != nil {
         log.Println("ERROR starting Minecraft:", err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -150,7 +150,7 @@ func (s *WebServer) start(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) stop(w http.ResponseWriter, r *http.Request) {
-    err := s.mcsv.StopMC()
+    err := s.Minecraft.StopMC()
     if err != nil {
         log.Println("ERROR stopping Minecraft:", err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -160,7 +160,7 @@ func (s *WebServer) stop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) status(w http.ResponseWriter, r *http.Request) {
-    if IsMCRunningBackground(s.mcsv.DataPath) {
+    if IsMCRunningBackground(s.Minecraft.DataPath) {
         w.Write([]byte("true"))
         return
     }
@@ -168,7 +168,7 @@ func (s *WebServer) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) console(w http.ResponseWriter, r *http.Request) {
-    if !IsMCRunningBackground(s.mcsv.DataPath) {
+    if !IsMCRunningBackground(s.Minecraft.DataPath) {
         w.Write([]byte("Minecraft is not running"))
         return
     }
@@ -184,9 +184,9 @@ func (s *WebServer) console(w http.ResponseWriter, r *http.Request) {
     }
 
     stdoutDone := make(chan struct{})
-    go pumpStdout(ws, s.mcsv.FileO, stdoutDone)
+    go pumpStdout(ws, s.Minecraft.FileO, stdoutDone)
     go ping(ws, stdoutDone)
-    pumpStdin(ws, s.mcsv.FileI)
+    pumpStdin(ws, s.Minecraft.FileI)
 }
 
 func pumpStdin(ws *websocket.Conn, FileI string) {

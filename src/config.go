@@ -73,5 +73,7 @@ func WriteConfigTempl(filePath string, config *Config) error {
     file, err := os.Create(filePath)
     if err != nil { return err }
     defer file.Close()
-    return json.NewEncoder(file).Encode(config)
+    encoder := json.NewEncoder(file)
+    encoder.SetIndent("", "    ")
+    return encoder.Encode(config)
 }

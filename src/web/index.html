@@ -201,8 +201,7 @@ async function updateStatus(init = false) {
 function connectWebSocket() {
   if (window["WebSocket"]) {
     conn = new WebSocket("wss://" + document.location.host + "/console");
-    // try ws if wss fails
-    if (!conn) {
+    if (!conn) { // try ws if wss fails
       conn = new WebSocket("ws://" + document.location.host + "/console");
     }
 
