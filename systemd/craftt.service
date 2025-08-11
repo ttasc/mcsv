@@ -1,0 +1,16 @@
+[Unit]
+Description=Craftt - Minecraft server control
+Wants=network.target
+After=syslog.target network-online.target
+
+[Service]
+Type=simple
+User=mcsv
+Group=mcsv
+ExecStart=/path/to/craftt -w -p /path/to/minecraft/data/folder -j /path/to/server/jar/file
+Restart=on-failure
+RestartSec=10
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
