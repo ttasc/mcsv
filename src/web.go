@@ -108,13 +108,13 @@ func (s *WebServer) logMiddleware(next http.Handler) http.Handler {
 
 func (s *WebServer) registerRoutes(mux *http.ServeMux) {
     // Static
-    mux.Handle("/web/icon.png", http.FileServer(http.FS(fs)))
+    mux.Handle("GET /web/icon.png", http.FileServer(http.FS(fs)))
 
     // Http
-    mux.HandleFunc("/",         s.dashboard)
-    mux.HandleFunc("/start",    s.start)
-    mux.HandleFunc("/stop",     s.stop)
-    mux.HandleFunc("/status",   s.status)
+    mux.HandleFunc("GET /",         s.dashboard)
+    mux.HandleFunc("POST /start",   s.start)
+    mux.HandleFunc("POST /stop",    s.stop)
+    mux.HandleFunc("GET /status",   s.status)
     // mux.HandleFunc("/backup",   s.backup)
     // mux.HandleFunc("/players",  s.players)
 
