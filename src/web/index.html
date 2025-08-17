@@ -13,7 +13,6 @@
       .container {
         max-width: 70%;
         margin: 0 auto;
-        padding: 20px;
       }
 
       .panel {
@@ -86,14 +85,41 @@
         outline: none;
         font-size: 16px;
       }
+
       .console-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 10px;
       }
+
       .console-header h3 {
         margin: 0;
+      }
+
+      .loading-indicator {
+        display: inline-block;
+        margin-left: 10px;
+        width: 8px;
+        height: 8px;
+        border: 2px solid rgba(255,255,255,.3);
+        border-radius: 50%;
+        border-top-color: #4CAF50;
+        animation: spin 1s ease-in-out infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      .status-message {
+        font-size: 14px;
+        margin-top: 5px;
+      }
+
+      .warning {
+        color: #ff9800;
+        font-weight: bold;
       }
     </style>
   </head>
@@ -102,13 +128,20 @@
       <h1>MINECRAFT SERVER CONTROL</h1>
 
       <div class="panel">
-        Status: <span id="status" class="status-offline">OFFLINE</span>
-        <div class="controls">
+        <div>
+          Status: <span id="status" class="status-offline">OFFLINE</span>
+          <span id="loading" class="loading-indicator" style="display:none"></span>
+        </div>
+        <div id="statusMessage" class="status-message"></div>
+
+        <div class="controls" style="margin-top:15px">
           <button id="startBtn" onclick="startServer()">Start Server</button>
           <button id="stopBtn" onclick="stopServer()" disabled>Stop Server</button>
 
           <span id="worldOptions" style="display:none">
-            <input type="checkbox" id="newWorld"> Create new world
+            <label style="cursor:pointer">
+              <input type="checkbox" id="newWorld"> Create new world
+            </label>
             <button id="backupBtn" onclick="backupWorld()">Backup World</button>
           </span>
         </div>
@@ -130,175 +163,200 @@
     </div>
 
 <script>
-var curState;
-var conn;
+let serverStatus = 'unknown';
+let conn = null;
+let statusCheckInterval;
+let statusCheckTimeout = null;
 
 function logToConsole(message) {
-  const console = document.getElementById('console');
-  console.innerHTML += message;
-  console.scrollTop = console.scrollHeight;
+  const consoleElem = document.getElementById('console');
+  consoleElem.innerHTML += message;
+  consoleElem.scrollTop = consoleElem.scrollHeight;
 }
 
 function clearConsole() {
-  const console = document.getElementById('console');
-  console.innerHTML = '';
+  document.getElementById('console').innerHTML = '';
 }
 
-async function isRunning() {
+function showStatusMessage(message, isWarning = false) {
+  const elem = document.getElementById('statusMessage');
+  elem.textContent = message;
+  elem.className = isWarning ? 'status-message warning' : 'status-message';
+}
+
+async function checkServerStatus() {
   try {
-    const response = await fetch('/status', { method: 'GET' });
-    if (!response.ok) throw new Error('Network response was not ok');
-    const data = await response.text();
-    return data === "true";
+    const response = await fetch('/status');
+    if (!response.ok) throw new Error('Server status check failed');
+    return await response.text() === "true";
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Status check error:', error);
     return false;
   }
 }
 
-async function updateStatus(init = false) {
-  const state = document.getElementById('status');
+async function updateStatus() {
+  const statusElem = document.getElementById('status');
   const startBtn = document.getElementById('startBtn');
   const stopBtn = document.getElementById('stopBtn');
   const commandInput = document.getElementById('commandInput');
   const worldOptions = document.getElementById('worldOptions');
+  const loadingIndicator = document.getElementById('loading');
 
   try {
-    const running = await isRunning();
+    loadingIndicator.style.display = 'inline-block';
+    const isRunning = await checkServerStatus();
 
-    if (init) {
-      curState = !running;  // Force update on initialization
-    }
+    if (isRunning && serverStatus !== 'running') {
+      // Server just started
+      statusElem.textContent = 'ONLINE';
+      statusElem.className = 'status-online';
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      commandInput.disabled = false;
+      worldOptions.style.display = 'none';
+      showStatusMessage('Server is running');
+      connectWebSocket();
+      serverStatus = 'running';
 
-    if (running !== curState) {
-      if (running) {
-        state.textContent = 'ONLINE';
-        state.className = 'status-online';
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-        commandInput.disabled = false;
-        worldOptions.style.display = 'none';
-        connectWebSocket();
-      } else {
-        state.textContent = 'OFFLINE';
-        state.className = 'status-offline';
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-        commandInput.disabled = true;
-        worldOptions.style.display = 'inline';
-        if (conn) {
-          conn.close();
-          conn = null;
-        }
+    } else if (!isRunning && serverStatus !== 'stopped') {
+      // Server just stopped
+      statusElem.textContent = 'OFFLINE';
+      statusElem.className = 'status-offline';
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      commandInput.disabled = true;
+      worldOptions.style.display = 'inline';
+      showStatusMessage('Server is stopped');
+
+      if (conn) {
+        conn.close();
+        conn = null;
       }
-      curState = running;
+      serverStatus = 'stopped';
     }
   } catch (error) {
+    showStatusMessage('Error checking server status', true);
     console.error('Status update error:', error);
+  } finally {
+    loadingIndicator.style.display = 'none';
   }
 }
 
 function connectWebSocket() {
-  if (window["WebSocket"]) {
-    conn = new WebSocket("wss://" + document.location.host + "/console");
-    if (!conn) { // try ws if wss fails
-      conn = new WebSocket("ws://" + document.location.host + "/console");
-    }
+  if (conn) return;  // Connection already exists
 
-    conn.onopen = function() {
-      logToConsole("Connected to server console\n");
-    };
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const url = `${protocol}//${window.location.host}/ws/console`;
 
-    conn.onclose = function (evt) {
-      logToConsole("<b>Connection closed.</b>");
-    };
+  try {
+    conn = new WebSocket(url);
 
-    conn.onerror = function(evt) {
-      logToConsole("<b>WebSocket error: " + evt.data + "</b>");
-    };
+    conn.onopen = () => logToConsole("Connected to server console\nLoading logs...\n");
+    conn.onclose = () => logToConsole("<b>Console connection closed</b>\n");
+    conn.onerror = (evt) => logToConsole(`<b>WebSocket error: ${evt.type}</b>\n`);
+    conn.onmessage = (evt) => logToConsole(ansiToHtml(evt.data));
 
-    conn.onmessage = function (evt) {
-      logToConsole(evt.data);
-    };
-  } else {
-    logToConsole("<b>WebSocket is not supported in this browser.</b>");
+  } catch (error) {
+    logToConsole(`<b>WebSocket connection failed: ${error.message}</b>\n`);
   }
 }
 
 async function startServer() {
-  clearConsole();
-
-  if (await isRunning()) {
-    logToConsole('Server is already running.');
-    return;
-  }
-
   const createNew = document.getElementById('newWorld').checked;
-  let url = '/start'
 
   if (createNew) {
-    const confirmation = confirm("Do you want to create a new world?\nThis will delete any existing world.");
+    const confirmation = confirm("WARNING: This will DELETE the current world!\n\nCreate new world?");
     if (!confirmation) {
-      logToConsole('World creation cancelled.');
+      logToConsole('Server start cancelled\n');
       return;
     }
-    url += '?newworld=true'
-    document.getElementById('newWorld').checked = false;
   }
 
+  clearConsole();
+  showStatusMessage('Starting server...');
+  document.body.style.cursor = 'wait';
+
   try {
-    document.body.style.cursor = 'wait';
-    const response = await fetch(url, { method: 'POST' });
+    const response = await fetch(`/start?newworld=${createNew}`, { method: 'POST' });
+    const result = await response.text();
 
-    if (!response.ok) throw new Error('Start request failed');
-
-    const data = await response.text();
-    if (data === 'started') {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      const checkStatus = setInterval(async () => {
-        if (await isRunning()) {
-          clearInterval(checkStatus);
-          updateStatus();
-        }
-      }, 1000);
+    if (result !== 'started') {
+      throw new Error('Server did not start');
     }
+
+    // Setup status monitoring
+    clearInterval(statusCheckInterval);
+    statusCheckInterval = setInterval(updateStatus, 10000);
+
+    // Set timeout in case server fails to start
+    clearTimeout(statusCheckTimeout);
+    statusCheckTimeout = setTimeout(() => {
+      if (serverStatus !== 'running') {
+        showStatusMessage('Server start timed out', true);
+        logToConsole('Error: Server start timed out\n');
+      }
+    }, 30000);
+
   } catch (error) {
-    logToConsole('Error: ' + error.message);
+    showStatusMessage('Start failed', true);
+    logToConsole(`Error: ${error.message}\n`);
   } finally {
     document.body.style.cursor = 'default';
   }
 }
 
 async function stopServer() {
-  if (!(await isRunning())) {
-    logToConsole('Server is not running.');
-    return;
-  }
+  showStatusMessage('Stopping server...');
+  document.body.style.cursor = 'wait';
 
   try {
-    document.body.style.cursor = 'wait';
     const response = await fetch('/stop', { method: 'POST' });
+    const result = await response.text();
 
-    if (!response.ok) throw new Error('Stop request failed');
-
-    const data = await response.text();
-    if (data === 'stopped') {
-      const checkStatus = setInterval(async () => {
-        if (!(await isRunning())) {
-          clearInterval(checkStatus);
-          updateStatus();
-        }
-      }, 1000);
+    if (result !== 'stopped') {
+      throw new Error('Server did not stop');
     }
+
+    // Setup status monitoring
+    clearInterval(statusCheckInterval);
+    statusCheckInterval = setInterval(updateStatus, 10000);
+
+    // Set timeout in case server fails to stop
+    clearTimeout(statusCheckTimeout);
+    statusCheckTimeout = setTimeout(() => {
+      if (serverStatus !== 'stopped') {
+        showStatusMessage('Stop command timed out', true);
+        logToConsole('Error: Server stop timed out\n');
+      }
+    }, 15000);
+
   } catch (error) {
-    logToConsole('Error: ' + error.message);
+    showStatusMessage('Stop failed', true);
+    logToConsole(`Error: ${error.message}\n`);
   } finally {
     document.body.style.cursor = 'default';
   }
 }
 
-function backupWorld() {
-  // TODO: Implement world backup
+async function backupWorld() {
+  showStatusMessage('Creating world backup...');
+
+  try {
+    const response = await fetch('/backup', { method: 'POST' });
+    const result = await response.text();
+
+    if (result !== 'backup_created') {
+      throw new Error('Backup creation failed');
+    }
+
+    showStatusMessage('Backup created successfully');
+    logToConsole('World backup created\n');
+
+  } catch (error) {
+    showStatusMessage('Backup failed', true);
+    logToConsole(`Error: ${error.message}\n`);
+  }
 }
 
 function sendCommand() {
@@ -309,8 +367,9 @@ function sendCommand() {
 
   if (conn && conn.readyState === WebSocket.OPEN) {
     conn.send(command);
+    logToConsole(`> ${command}\n`);
   } else {
-    logToConsole('Error: Not connected to server');
+    logToConsole('Error: Not connected to server\n');
   }
 
   input.value = '';
@@ -318,10 +377,173 @@ function sendCommand() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  updateStatus(true);
-  setInterval(updateStatus, 10000);  // Regular status updates
+  // Setup UI event listeners
   document.getElementById('clearLogsBtn').addEventListener('click', clearConsole);
+
+  // Handle Enter key in command input
+  document.getElementById('commandInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendCommand();
+  });
+
+  // Initial status check
+  updateStatus();
+
+  // Setup periodic status checks
+  statusCheckInterval = setInterval(updateStatus, 10000);
 });
+
+// Clean up on page unload
+window.addEventListener('beforeunload', () => {
+  clearInterval(statusCheckInterval);
+  clearTimeout(statusCheckTimeout);
+  if (conn) conn.close();
+});
+
+function ansiToHtml(input) {
+  const escapeHtml = (str) => str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+  const convert256Color = (n) => {
+    if (n < 0) n = 0;
+    if (n > 255) n = 255;
+    if (n < 16) {
+      const colors = [
+        '#000000', '#800000', '#008000', '#808000', '#000080', '#800080', '#008080', '#c0c0c0',
+        '#808080', '#ff0000', '#00ff00', '#ffff00', '#0000ff', '#ff00ff', '#00ffff', '#ffffff'
+      ];
+      return colors[n];
+    } else if (n < 232) {
+      n -= 16;
+      const r = Math.floor(n / 36);
+      const g = Math.floor((n % 36) / 6);
+      const b = n % 6;
+      const levels = [0, 95, 135, 175, 215, 255];
+      return `rgb(${levels[r]},${levels[g]},${levels[b]})`;
+    } else {
+      const gray = 8 + (n - 232) * 10;
+      return `rgb(${gray},${gray},${gray})`;
+    }
+  };
+
+  const tokens = input.split(/(\x1b\[[0-9;]*m)/g);
+  let output = '';
+  let currentStyle = {};
+  let inSpan = false;
+
+  for (const token of tokens) {
+    if (token.match(/^\x1b\[[0-9;]*m$/)) {
+      if (inSpan) {
+        output += '</span>';
+        inSpan = false;
+      }
+
+      const codes = token.substring(2, token.length - 1)
+        .split(';')
+        .filter(x => x !== '')
+        .map(Number);
+
+      let i = 0;
+      while (i < codes.length) {
+        const code = codes[i];
+        if (code === 0) {
+          currentStyle = {};
+          i++;
+        } else if (code === 1) {
+          currentStyle.fontWeight = 'bold';
+          i++;
+        } else if (code === 3) {
+          currentStyle.fontStyle = 'italic';
+          i++;
+        } else if (code === 4) {
+          currentStyle.textDecoration =
+            (currentStyle.textDecoration || '') + ' underline';
+          i++;
+        } else if (code === 9) {
+          currentStyle.textDecoration =
+            (currentStyle.textDecoration || '') + ' line-through';
+          i++;
+        } else if (code === 22) {
+          currentStyle.fontWeight = 'normal';
+          i++;
+        } else if (code === 23) {
+          currentStyle.fontStyle = 'normal';
+          i++;
+        } else if (code === 24) {
+          currentStyle.textDecoration = (currentStyle.textDecoration || '')
+            .split(' ')
+            .filter(x => x !== 'underline')
+            .join(' ') || undefined;
+          i++;
+        } else if (code === 29) {
+          currentStyle.textDecoration = (currentStyle.textDecoration || '')
+            .split(' ')
+            .filter(x => x !== 'line-through')
+            .join(' ') || undefined;
+          i++;
+        } else if (code === 39) {
+          delete currentStyle.color;
+          i++;
+        } else if (code === 49) {
+          delete currentStyle.backgroundColor;
+          i++;
+        } else if (code >= 30 && code <= 37) {
+          const colors = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'];
+          currentStyle.color = colors[code - 30];
+          i++;
+        } else if (code >= 90 && code <= 97) {
+          const colors = ['#4D4D4D', '#FF5555', '#55FF55', '#FFFF55', '#5555FF', '#FF55FF', '#55FFFF', '#FFFFFF'];
+          currentStyle.color = colors[code - 90];
+          i++;
+        } else if (code >= 40 && code <= 47) {
+          const colors = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'];
+          currentStyle.backgroundColor = colors[code - 40];
+          i++;
+        } else if (code >= 100 && code <= 107) {
+          const colors = ['#4D4D4D', '#FF5555', '#55FF55', '#FFFF55', '#5555FF', '#FF55FF', '#55FFFF', '#FFFFFF'];
+          currentStyle.backgroundColor = colors[code - 100];
+          i++;
+        } else if (code === 38 || code === 48) {
+          if (i + 2 < codes.length && codes[i + 1] === 5) {
+            const color = convert256Color(codes[i + 2]);
+            if (code === 38) {
+              currentStyle.color = color;
+            } else {
+              currentStyle.backgroundColor = color;
+            }
+            i += 3;
+          } else {
+            i++;
+          }
+        } else {
+          i++;
+        }
+      }
+
+      // Remove undefined values
+      Object.keys(currentStyle).forEach(key =>
+        currentStyle[key] === undefined && delete currentStyle[key]
+      );
+
+      if (Object.keys(currentStyle).length > 0) {
+        const style = Object.entries(currentStyle)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(';');
+        output += `<span style="${style}">`;
+        inSpan = true;
+      }
+    } else {
+      output += escapeHtml(token);
+    }
+  }
+
+  if (inSpan) output += '</span>';
+  return output;
+}
+
 </script>
 </body>
 </html>

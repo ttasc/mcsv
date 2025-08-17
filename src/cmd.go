@@ -17,6 +17,7 @@ import (
 
 type Minecraft struct {
     DataPath    string
+    CrafttPath  string
     javaCmd     string
     args        []string
 
@@ -25,7 +26,14 @@ type Minecraft struct {
 }
 
 func NewMC(dataPath, jarFile string, config McConfig) (*Minecraft, error) {
-    fifoFile := dataPath + "/fifo"
+    crafttPath := dataPath + "/craftt"
+    if _, err := os.Stat(crafttPath); os.IsNotExist(err) {
+        if err := os.MkdirAll(crafttPath, 0755); err != nil {
+            return nil, err
+        }
+    }
+
+    fifoFile := crafttPath + "/fifo"
     _, err := os.Stat(fifoFile)
     if err != nil && os.IsNotExist(err) {
         if err := syscall.Mkfifo(fifoFile, 0640); err != nil {
@@ -37,14 +45,15 @@ func NewMC(dataPath, jarFile string, config McConfig) (*Minecraft, error) {
     args = append(args, "-jar", jarFile)
     args = append(args, strings.Split(config.JarOpts, " ")...)
 
-    if IsMCRunningBackground(dataPath) {
+    logFile := crafttPath + "/minecraft.log"
+    if isMCRunningBackground(crafttPath) {
         return &Minecraft{
-            dataPath, config.JavaCmd, args, fifoFile, dataPath + "/logs/latest.log",
+            dataPath, crafttPath, config.JavaCmd, args, fifoFile, logFile,
         }, nil
     }
 
     return &Minecraft{
-        dataPath, config.JavaCmd, args, fifoFile, dataPath + "/logs/latest.log",
+        dataPath, crafttPath, config.JavaCmd, args, fifoFile, logFile,
     }, nil
 }
 
@@ -71,9 +80,17 @@ func (c *Minecraft) StartMCBackground() error {
     minecraft := exec.Command(c.javaCmd, c.args...)
     minecraft.Dir = c.DataPath
 
-    var err error
-    minecraft.Stdin, err = tail.StdoutPipe()
+    inputFromTail, err := tail.StdoutPipe()
     if err != nil { return err }
+
+    os.Remove(c.FileO)
+    outputFile, err := os.OpenFile(c.FileO, os.O_WRONLY|os.O_CREATE, 0640)
+    if err != nil { return err }
+    defer outputFile.Close()
+
+    minecraft.Stdin = inputFromTail
+    minecraft.Stdout = outputFile
+    minecraft.Stderr = outputFile
 
     sysProcAttr := &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
     tail.SysProcAttr = sysProcAttr
@@ -84,7 +101,7 @@ func (c *Minecraft) StartMCBackground() error {
     if err := minecraft.Start()
     err != nil { return err }
 
-    if err := writePIDsToFile(c.DataPath, tail.Process.Pid, minecraft.Process.Pid)
+    if err := writePIDsToFile(c.CrafttPath, tail.Process.Pid, minecraft.Process.Pid)
     err != nil { return err }
 
     if err := tail.Process.Release()
@@ -96,7 +113,7 @@ func (c *Minecraft) StartMCBackground() error {
 }
 
 func (c *Minecraft) StopMC() error {
-    tailPID, mcPID, err := readPIDsFromFile(c.DataPath); if err != nil { return err }
+    tailPID, mcPID, err := readPIDsFromFile(c.CrafttPath); if err != nil { return err }
 
     tailProc, err := os.FindProcess(tailPID); if err != nil { return err }
     minecraftProc, err := os.FindProcess(mcPID); if err != nil { return err }
@@ -140,8 +157,12 @@ func RemoveOldWorld(dataPath string) error {
     return nil
 }
 
-func IsMCRunningBackground(dataPath string) bool {
-    tailPID, mcPID, err := readPIDsFromFile(dataPath)
+func (c *Minecraft) IsMCRunningBackground() bool {
+    return isMCRunningBackground(c.CrafttPath)
+}
+
+func isMCRunningBackground(crafttPath string) bool {
+    tailPID, mcPID, err := readPIDsFromFile(crafttPath)
     if err != nil { return false }
 
     tailProc, err := os.FindProcess(tailPID); if err != nil { return false }
@@ -172,16 +193,16 @@ func wait(tailProc, minecraftProc *os.Process) error {
     return errors.Join(tailErr, minecraftErr)
 }
 
-func writePIDsToFile(dataPath string, tailPID, minecraftPID int) error {
+func writePIDsToFile(crafttPath string, tailPID, minecraftPID int) error {
     return os.WriteFile(
-        dataPath + "/pid",
+        crafttPath + "/pid",
         fmt.Appendf(nil, "%d\n%d", tailPID, minecraftPID),
         0640,
     )
 }
 
-func readPIDsFromFile(dataPath string) (int, int, error) {
-    pidBytes, err := os.ReadFile(dataPath + "/pid")
+func readPIDsFromFile(crafttPath string) (int, int, error) {
+    pidBytes, err := os.ReadFile(crafttPath + "/pid")
     if err != nil { return -1, -1, err }
 
     pidStr := strings.Split(string(pidBytes), "\n")

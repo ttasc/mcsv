@@ -119,7 +119,7 @@ func (s *WebServer) registerRoutes(mux *http.ServeMux) {
     // mux.HandleFunc("/players",  s.players)
 
     // WebSocket
-    mux.HandleFunc("/console",  s.console)
+    mux.HandleFunc("GET /ws/console",  s.console)
 }
 
 func (s *WebServer) dashboard(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +160,7 @@ func (s *WebServer) stop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) status(w http.ResponseWriter, r *http.Request) {
-    if IsMCRunningBackground(s.Minecraft.DataPath) {
+    if s.Minecraft.IsMCRunningBackground() {
         w.Write([]byte("true"))
         return
     }
@@ -168,7 +168,7 @@ func (s *WebServer) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) console(w http.ResponseWriter, r *http.Request) {
-    if !IsMCRunningBackground(s.Minecraft.DataPath) {
+    if !s.Minecraft.IsMCRunningBackground() {
         w.Write([]byte("Minecraft is not running"))
         return
     }
@@ -214,6 +214,7 @@ func pumpStdin(ws *websocket.Conn, FileI string) {
 }
 
 func pumpStdout(ws *websocket.Conn, FileO string, done chan struct{}) {
+    time.Sleep(2 * time.Second)
     // Open file once for all operations
     fFileO, err := os.Open(FileO)
     if err != nil {

@@ -52,7 +52,7 @@ func (f Flags) Validate() error {
     }
 
     if *f.configFile == "" {
-        *f.configFile = *f.dataPath + "/config.json"
+        *f.configFile = *f.dataPath + "/craftt/config.json"
     } else if _, err := os.Stat(*f.configFile); err != nil {
         return err
     }
