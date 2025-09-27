@@ -214,7 +214,7 @@ func pumpStdin(ws *websocket.Conn, FileI string) {
 }
 
 func pumpStdout(ws *websocket.Conn, FileO string, done chan struct{}) {
-    time.Sleep(2 * time.Second)
+    // time.Sleep(2 * time.Second)
     // Open file once for all operations
     fFileO, err := os.Open(FileO)
     if err != nil {
@@ -241,10 +241,15 @@ func pumpStdout(ws *websocket.Conn, FileO string, done chan struct{}) {
 
     buf := make([]byte, 1024)
 
+    _, err = fFileO.Seek(-2048, io.SeekEnd)
+    if err != nil {
+        log.Println("ERROR getting file position:", err)
+        return
+    }
+
     // Send initial file content in chunks (memory-efficient)
-    // for {
-        n, err := fFileO.ReadAt(buf, size-1024)
-        // n, err = fFileO.Read(buf)
+    for {
+        n, err := fFileO.Read(buf)
         if n > 0 {
             ws.SetWriteDeadline(time.Now().Add(writeWait))
             if err := ws.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
@@ -252,14 +257,14 @@ func pumpStdout(ws *websocket.Conn, FileO string, done chan struct{}) {
                 return
             }
         }
-        // if err == io.EOF {
-        //     break
-        // }
+        if err == io.EOF {
+            break
+        }
         if err != nil {
             log.Println("ERROR reading initial content:", err)
             return
         }
-    // }
+    }
 
     // Update current position after initial read
     size, err = fFileO.Seek(0, io.SeekCurrent)
