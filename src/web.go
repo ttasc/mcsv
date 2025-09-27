@@ -239,10 +239,12 @@ func pumpStdout(ws *websocket.Conn, FileO string, done chan struct{}) {
     }
     size := stat.Size()
 
-    // Send initial file content in chunks (memory-efficient)
     buf := make([]byte, 1024)
+
+    // Send initial file content in chunks (memory-efficient)
     for {
-        n, err := fFileO.Read(buf)
+        n, err := fFileO.ReadAt(buf, size-1024)
+        // n, err = fFileO.Read(buf)
         if n > 0 {
             ws.SetWriteDeadline(time.Now().Add(writeWait))
             if err := ws.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
