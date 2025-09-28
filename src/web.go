@@ -214,7 +214,7 @@ func pumpStdin(ws *websocket.Conn, FileI string) {
 }
 
 func pumpStdout(ws *websocket.Conn, FileO string, done chan struct{}) {
-    // time.Sleep(2 * time.Second)
+    time.Sleep(2 * time.Second)
     // Open file once for all operations
     fFileO, err := os.Open(FileO)
     if err != nil {
