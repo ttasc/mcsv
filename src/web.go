@@ -137,6 +137,7 @@ func (s *WebServer) start(w http.ResponseWriter, r *http.Request) {
         if err := RemoveOldWorld(s.Minecraft.DataPath); err != nil {
             log.Println("ERROR removing old world:", err)
             http.Error(w, err.Error(), http.StatusInternalServerError)
+            w.Write([]byte(err.Error()))
             return
         }
     }
@@ -144,6 +145,7 @@ func (s *WebServer) start(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         log.Println("ERROR starting Minecraft:", err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
+        w.Write([]byte(err.Error()))
         return
     }
     w.Write([]byte("started"))
@@ -154,6 +156,7 @@ func (s *WebServer) stop(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         log.Println("ERROR stopping Minecraft:", err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
+        w.Write([]byte(err.Error()))
         return
     }
     w.Write([]byte("stopped"))
